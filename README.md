@@ -27,6 +27,42 @@ Depthcharge analyzes packages using three modular scanners, producing a unified 
 
 ---
 
+## 🏗️ Architecture
+
+Depthcharge is built with a highly modular and extensible architecture, separating the core analysis engines from the presentation layers (CLI & Web Dashboard).
+
+```mermaid
+graph TD
+    A[User Input] -->|CLI or Web Dashboard| B(Depthcharge Core Engine)
+    
+    subgraph Analysis Modules
+        B --> C[Reputation Scanner]
+        B --> D[Static Analyzer]
+        B --> E[Dynamic Sandbox]
+    end
+    
+    C -->|API Calls| F[(PyPI / NPM Registries)]
+    C -->|API Calls| G[(OSV Database)]
+    
+    D -->|AST Parsing| H{Python/JS Source Code}
+    D -->|YARA & Entropy| H
+    
+    E -->|strace hook| I[Isolated Docker Container]
+    
+    C -.-> J[Risk Scorer]
+    D -.-> J
+    E -.-> J
+    
+    J --> K[(SQLite Database)]
+    K --> L[Web Dashboard / Reports]
+```
+
+- **Core Engine (`depthcharge.py`)**: The central orchestrator that parses user inputs, coordinates the execution of the selected scanners, and passes results to the Risk Scorer.
+- **Risk Scorer (`scorer.py`)**: Aggregates the threat indicators from all modules and calculates a final standardized risk score (0-100).
+- **SQLite Database**: Persists scan history, allowing the Web Dashboard to fetch and display previous analysis results instantaneously without re-scanning.
+
+---
+
 ## 🚀 Installation & Setup
 
 ### 1. Prerequisites
@@ -112,6 +148,42 @@ python depthcharge.py scan "file://$(pwd)/tests/test_packages/dynamic_malware/di
 python depthcharge.py scan "file://$(pwd)/tests/test_packages/dynamic_malware/dist/evil_curl_exfil-1.0.0.tar.gz"
 ```
 *Expected Result: Depthcharge will successfully flag these packages with a massive penalty for suspicious runtime behavior, leading to a **High Risk** verdict.*
+
+---
+
+## ⚙️ CI/CD Workflow Integration
+
+Depthcharge is built to seamlessly integrate into modern CI/CD pipelines (like GitHub Actions, GitLab CI, or Jenkins) to automatically block malicious packages from entering your codebase.
+
+### GitHub Actions Example
+
+We have provided a pre-configured GitHub Actions workflow at `.github/workflows/security-scan.yml`. It will automatically scan dependency changes on `push` or `pull_request` events.
+
+If a developer adds a new package to `requirements.txt` or `package.json` that scores `70` or higher (High Risk), Depthcharge will **fail the build**, outputting the threat breakdown directly in the CI logs!
+
+```yaml
+name: Depthcharge Security Scan
+on: [push, pull_request]
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install Depthcharge
+        run: pip install -r requirements.txt
+        
+      - name: Audit requirements.txt
+        # Fails the pipeline if any package in the file returns a High Risk score
+        run: python depthcharge.py scan-file requirements.txt --skip-dynamic
+```
+*Note: We skip dynamic scanning in standard CI environments unless you specifically configure nested Docker capabilities (Docker-in-Docker).*
 
 ---
 
