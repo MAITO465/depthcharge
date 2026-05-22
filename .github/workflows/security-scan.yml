@@ -1,0 +1,44 @@
+name: DepthCharge Security Scan
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'requirements.txt'
+      - 'package.json'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths:
+      - 'requirements.txt'
+      - 'package.json'
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Install DepthCharge Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+
+      - name: Run DepthCharge Scan (PyPI)
+        if: hashFiles('requirements.txt') != ''
+        run: |
+          python depthcharge.py scan --lockfile requirements.txt --type pypi --threshold 70 --fail-on-high
+
+      - name: Run DepthCharge Scan (NPM)
+        if: hashFiles('package.json') != ''
+        run: |
+          python depthcharge.py scan --lockfile package.json --type npm --threshold 70 --fail-on-high

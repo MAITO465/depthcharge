@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+data/depthcharge.db
+.pytest_cache/
+tests/evilpkg/evilpkg.egg-info/
+tests/test_packages/dynamic_malware/evil_dynamic.egg-info/
+tests/test_packages/dynamic_malware/evil_curl_exfil.egg-info/

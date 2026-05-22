@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depthcharge — Supply Chain Threat Analyzer</title>
+    <meta name="description" content="DepthCharge: Analyze dependencies for supply chain attacks with reputation scoring, static analysis, and dynamic sandbox execution.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="bg-mesh"></div>
+    <div class="bg-mesh-2"></div>
+    <div class="bg-glow"></div>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="logo-wrap">
+                    <i class="fa-solid fa-shield-halved logo-icon"></i>
+                    <div class="logo-ring"></div>
+                </div>
+                <div class="brand-text">
+                    <h1>DEPTHCHARGE</h1>
+                    <span>Supply Chain Threat Analyzer</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator" id="docker-status">
+                    <i class="fa-brands fa-docker"></i>
+                    <span id="docker-text">Checking Docker...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-chart-bar"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-total">0</span>
+                    <span class="stat-label">Total Scans</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon warn"><i class="fa-solid fa-gauge-high"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-avg">0</span>
+                    <span class="stat-label">Avg Risk Score</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon danger"><i class="fa-solid fa-skull-crossbones"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-high">0</span>
+                    <span class="stat-label">High Risk</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon safe"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-safe">0</span>
+                    <span class="stat-label">Safe Packages</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <main class="app-content">
+            <!-- Left Panel: Trigger & History -->
+            <section class="control-panel">
+                <div class="glass-card trigger-card">
+                    <h2><i class="fa-solid fa-crosshairs"></i> Analyze Dependency</h2>
+                    <form id="scan-form" class="scan-form">
+                        <div class="input-group">
+                            <input type="text" id="package-input" placeholder="e.g. requests, lodash, or file://..." required autocomplete="off">
+                            <label for="package-input">Package Name or file:// URL</label>
+                        </div>
+                        
+                        <div class="scan-options">
+                            <div class="select-group">
+                                <label for="ecosystem-select">Registry</label>
+                                <select id="ecosystem-select">
+                                    <option value="pypi">PyPI (Python)</option>
+                                    <option value="npm">NPM (Node.js)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="module-toggles">
+                                <span class="toggles-label">Modules:</span>
+                                <label class="toggle-switch" title="Reputation Scan (Metadata, OSV, Typosquatting)">
+                                    <input type="checkbox" id="toggle-rep" checked>
+                                    <span class="slider"></span>
+                                    <span class="toggle-text">Reputation</span>
+                                </label>
+                                <label class="toggle-switch" title="Static Analysis (AST, YARA, Entropy)">
+                                    <input type="checkbox" id="toggle-static" checked>
+                                    <span class="slider"></span>
+                                    <span class="toggle-text">Static</span>
+                                </label>
+                                <label class="toggle-switch" title="Dynamic Sandbox (Docker execution tracing)">
+                                    <input type="checkbox" id="toggle-dynamic" checked>
+                                    <span class="slider"></span>
+                                    <span class="toggle-text">Dynamic</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <button type="submit" class="btn-primary" id="scan-btn">
+                                <span>Execute Scan</span>
+                                <i class="fa-solid fa-circle-notch fa-spin btn-spinner"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="glass-card history-card">
+                    <div class="history-header">
+                        <h2><i class="fa-solid fa-clock-rotate-left"></i> Scan History</h2>
+                        <button id="refresh-btn" class="btn-icon" title="Refresh History"><i class="fa-solid fa-rotate"></i></button>
+                    </div>
+                    <div class="search-group">
+                        <i class="fa-solid fa-search search-icon"></i>
+                        <input type="text" id="history-search" placeholder="Filter packages..." autocomplete="off">
+                    </div>
+                    <div class="history-list" id="history-items">
+                        <div class="list-placeholder">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <p>No scans yet. Trigger a scan above.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Scan Details -->
+            <section class="results-panel">
+                <div class="glass-card detail-card empty-state" id="detail-card">
+                    <div class="result-placeholder">
+                        <i class="fa-solid fa-shield-halved logo-pulse"></i>
+                        <h3>Ready for Inspection</h3>
+                        <p>Select a package from history or execute a new scan to view the depth threat analysis report.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Details template -->
+    <template id="report-template">
+        <div class="report-content">
+            <!-- Final Verdict Banner -->
+            <div class="verdict-banner" id="verdict-banner">
+                <i class="fa-solid fa-circle-check" id="verdict-icon"></i>
+                <h1 id="verdict-text">LEGITIMATE</h1>
+            </div>
+
+            <div class="report-header">
+                <div class="report-title-area">
+                    <div class="pkg-meta">
+                        <span class="badge-eco" id="eco-badge">PyPI</span>
+                        <h2 id="report-pkg-name">requests</h2>
+                        <span class="version-label" id="report-version">v2.31.0</span>
+                    </div>
+                    <p class="scanned-time"><i class="fa-regular fa-calendar"></i> Scanned <span id="report-time">2 mins ago</span></p>
+                </div>
+                <!-- SVG Risk Gauge -->
+                <div class="gauge-container" id="report-score-card">
+                    <svg class="gauge-svg" viewBox="0 0 120 120">
+                        <circle class="gauge-bg" cx="60" cy="60" r="52" />
+                        <!-- We use stroke-dasharray="326.72" for circumference -->
+                        <circle class="gauge-fill" cx="60" cy="60" r="52" id="gauge-arc" />
+                    </svg>
+                    <div class="gauge-center">
+                        <span class="gauge-value" id="report-score-number">0</span>
+                        <span class="gauge-label" id="report-score-level">LOW RISK</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="export-actions">
+                <span class="export-label">Export Report:</span>
+                <a href="#" class="btn-export pdf" id="export-pdf-link"><i class="fa-solid fa-file-pdf"></i> PDF</a>
+                <a href="#" class="btn-export html" id="export-html-link"><i class="fa-solid fa-file-code"></i> HTML</a>
+                <a href="#" class="btn-export md" id="export-md-link"><i class="fa-solid fa-file-lines"></i> Markdown</a>
+            </div>
+
+            <div class="score-breakdown-bar">
+                <div class="breakdown-segment rep" id="bar-rep" title="Reputation risk"></div>
+                <div class="breakdown-segment stat" id="bar-stat" title="Static analysis risk"></div>
+                <div class="breakdown-segment dyn" id="bar-dyn" title="Dynamic scan risk"></div>
+            </div>
+            <div class="breakdown-labels">
+                <span><i class="fa-solid fa-star-half-stroke text-rep"></i> Rep: <strong id="val-rep">0</strong>/75</span>
+                <span><i class="fa-solid fa-code text-stat"></i> Static: <strong id="val-stat">0</strong>/45</span>
+                <span><i class="fa-solid fa-terminal text-dyn"></i> Dynamic: <strong id="val-dyn">0</strong>/70</span>
+            </div>
+
+            <div class="report-body">
+                <div class="report-section card-reasons">
+                    <h3><i class="fa-solid fa-list-check"></i> Risk Analysis Factors</h3>
+                    <ul class="reason-list" id="report-reasons-list"></ul>
+                </div>
+
+                <div class="metadata-grid">
+                    <div class="meta-item"><span class="label">Publisher / Author</span><span class="val" id="meta-author">Unknown</span></div>
+                    <div class="meta-item"><span class="label">Author Email</span><span class="val" id="meta-email">Unknown</span></div>
+                    <div class="meta-item"><span class="label">Created Date</span><span class="val" id="meta-created">Unknown</span></div>
+                    <div class="meta-item"><span class="label">Total Releases</span><span class="val" id="meta-releases">0</span></div>
+                </div>
+
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" data-tab="vulns"><i class="fa-solid fa-triangle-exclamation"></i> Vulns (<span id="count-vulns">0</span>)</button>
+                        <button class="tab-btn" data-tab="static"><i class="fa-solid fa-code"></i> Static (<span id="count-static">0</span>)</button>
+                        <button class="tab-btn" data-tab="dynamic"><i class="fa-solid fa-box-open"></i> Dynamic (<span id="count-dynamic">0</span>)</button>
+                    </div>
+                    <div class="tabs-content">
+                        <div class="tab-panel active" id="panel-vulns">
+                            <div class="empty-tab-msg" id="empty-vulns-msg"><i class="fa-solid fa-circle-check text-success"></i><p>No security vulnerability CVEs/GHSAs identified.</p></div>
+                            <div class="vuln-list" id="vuln-items-list"></div>
+                        </div>
+                        <div class="tab-panel" id="panel-static">
+                            <div class="empty-tab-msg" id="empty-static-msg"><i class="fa-solid fa-circle-check text-success"></i><p>No static analysis threats or obfuscation found.</p></div>
+                            <div class="static-alerts-list" id="static-alerts-items"></div>
+                        </div>
+                        <div class="tab-panel" id="panel-dynamic">
+                            <div class="empty-tab-msg" id="empty-dynamic-msg"><i class="fa-solid fa-circle-check text-success"></i><p>No suspicious activities detected in the sandbox.</p></div>
+                            <div id="dynamic-scans-area">
+                                <div class="dynamic-events-list" id="dynamic-events-items"></div>
+                                <div class="terminal-container">
+                                    <div class="term-header">
+                                        <span><i class="fa-solid fa-terminal"></i> Sandbox Output</span>
+                                        <button class="btn-copy-term" id="btn-copy-log" title="Copy log"><i class="fa-regular fa-copy"></i></button>
+                                    </div>
+                                    <pre class="term-body" id="sandbox-term-body">No logs captured.</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

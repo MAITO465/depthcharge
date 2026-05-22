@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "depthcharge"
+version = "0.1.0"
+description = "A reputation, static, and dynamic dependency checker tool"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.28.0",
+    "docker>=6.1.0",
+    "rich>=13.0.0",
+    "Flask>=2.3.0",
+    "Flask-SQLAlchemy>=3.0.0",
+    "packaging>=23.0"
+]
+
+[project.scripts]
+depthcharge = "depthcharge:main"

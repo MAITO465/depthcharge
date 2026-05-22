@@ -1,0 +1,13 @@
+# Legitimate packages
+requests>=2.28.0
+numpy>=1.22.0
+flask>=2.3.0
+cryptography>=40.0.0
+urllib3>=1.26.0
+
+# Typosquatted / Suspicious packages to trigger alerts
+reqeusts
+numyp
+flaskk
+urllib4
+cryptograhy

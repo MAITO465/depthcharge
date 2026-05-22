@@ -1,0 +1,7 @@
+requests
+numpy
+flask
+django
+pandas
+scapy
+cryptography

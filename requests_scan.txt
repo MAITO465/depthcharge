@@ -1,0 +1,144 @@
+╭────────────────────────────────────────────────╮
+│ Depthcharge dependency analysis: pypi/requests │
+╰────────────────────────────────────────────────╯
+✓ Reputation Scan complete.
+✓ Static Scan complete.
+⚠ Dynamic scan skipped by request.
+╭──────────────────────────────── Scan Summary ────────────────────────────────╮
+│ Risk Score: 45/100 | Risk Level: Medium                                      │
+│                                                                              │
+│ Reasons for score:                                                           │
+│ - Obfuscated code or high-entropy string literals detected (+25 points).     │
+│ - Dangerous AST patterns (e.g. eval/exec, base64 decoding chains, setup.py   │
+│ install/network hooks) detected (+20 points).                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                        Package Details                        
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Property              ┃ Value                               ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Name                  │ requests                            │
+│ Ecosystem             │ PYPI                                │
+│ Latest Version        │ 2.34.2                              │
+│ Author                │                                     │
+│ Author Email          │ Kenneth Reitz <me@kennethreitz.org> │
+│ Created At            │ 2011-02-14T08:49:42                 │
+│ Latest Release        │ 2026-05-14T19:25:27                 │
+│ Releases Count        │ 163                                 │
+│ Vulnerabilities (OSV) │ 0                                   │
+└───────────────────────┴─────────────────────────────────────┘
+                             Static Analysis Alerts                             
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ File                 ┃ Line ┃ Severity ┃ Type         ┃ Message              ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ requests-2.34.2/PKG… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ network_connection   │
+│ requests-2.34.2/HIS… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/HIS… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ network_connection   │
+│ requests-2.34.2/REA… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ network_connection   │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ sensitive_files      │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ network_connection   │
+│ requests-2.34.2/src… │ 1    │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 193,   │
+│                      │      │          │              │ entropy: 4.55)       │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 284  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 1147,  │
+│                      │      │          │              │ entropy: 4.56)       │
+│ requests-2.34.2/src… │ 377  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 553,   │
+│                      │      │          │              │ entropy: 4.54)       │
+│ requests-2.34.2/src… │ 3    │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 324,   │
+│                      │      │          │              │ entropy: 4.53)       │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ network_connection   │
+│ requests-2.34.2/src… │ 6    │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 762,   │
+│                      │      │          │              │ entropy: 4.97)       │
+│ requests-2.34.2/src… │ 1    │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 526,   │
+│                      │      │          │              │ entropy: 4.68)       │
+│ requests-2.34.2/src… │ 1    │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 158,   │
+│                      │      │          │              │ entropy: 4.83)       │
+│ requests-2.34.2/src… │ 27   │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 2552,  │
+│                      │      │          │              │ entropy: 4.75)       │
+│ requests-2.34.2/src… │ 91   │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 233,   │
+│                      │      │          │              │ entropy: 4.52)       │
+│ requests-2.34.2/src… │ 103  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 363,   │
+│                      │      │          │              │ entropy: 4.51)       │
+│ requests-2.34.2/src… │ 123  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 472,   │
+│                      │      │          │              │ entropy: 4.59)       │
+│ requests-2.34.2/src… │ 140  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 471,   │
+│                      │      │          │              │ entropy: 4.59)       │
+│ requests-2.34.2/src… │ 157  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 473,   │
+│                      │      │          │              │ entropy: 4.61)       │
+│ requests-2.34.2/src… │ 172  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 231,   │
+│                      │      │          │              │ entropy: 4.50)       │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ sensitive_files      │
+│ requests-2.34.2/src… │ 409  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 770,   │
+│                      │      │          │              │ entropy: 4.51)       │
+│ requests-2.34.2/src… │ 441  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 606,   │
+│                      │      │          │              │ entropy: 4.65)       │
+│ requests-2.34.2/src… │ 529  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 164,   │
+│                      │      │          │              │ entropy: 4.51)       │
+│ requests-2.34.2/src… │ 537  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 43,    │
+│                      │      │          │              │ entropy: 4.51)       │
+│ requests-2.34.2/src… │ 538  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 36,    │
+│                      │      │          │              │ entropy: 4.52)       │
+│ requests-2.34.2/src… │ 676  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 52,    │
+│                      │      │          │              │ entropy: 5.70)       │
+│ requests-2.34.2/src… │ 727  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 239,   │
+│                      │      │          │              │ entropy: 4.51)       │
+│ requests-2.34.2/src… │ 966  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 188,   │
+│                      │      │          │              │ entropy: 4.66)       │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 21   │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 982,   │
+│                      │      │          │              │ entropy: 4.58)       │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ dynamic_execution    │
+│ requests-2.34.2/src… │ 515  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 542,   │
+│                      │      │          │              │ entropy: 4.59)       │
+│ requests-2.34.2/src… │ 528  │ High     │ high_entropy │ High-entropy string  │
+│                      │      │          │              │ literal (len: 227,   │
+│                      │      │          │              │ entropy: 4.73)       │
+│ requests-2.34.2/src… │ 1    │ High     │ yara_match   │ YARA match:          │
+│                      │      │          │              │ network_connection   │
+└──────────────────────┴──────┴──────────┴──────────────┴──────────────────────┘
