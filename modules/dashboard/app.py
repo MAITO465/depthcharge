@@ -3,7 +3,8 @@ import sys
 import sqlite3
 import json
 import threading
-from flask import Flask, render_template, jsonify, request
+import time as _time
+from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 
 # Ensure parent directory is in sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -25,6 +26,17 @@ from flask import send_file
 
 app = Flask(__name__)
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "depthcharge.db")
+
+# ── Live scan progress store ──────────────────────────────────────────────────
+# Maps scan_id → list of progress event dicts.
+# Written by the background scan thread; read by the SSE stream endpoint.
+_progress: dict = {}
+
+def _emit(scan_id: int, phase: str, status: str, message: str) -> None:
+    """Append a progress event for the given scan."""
+    _progress.setdefault(scan_id, []).append({
+        "phase": phase, "status": status, "message": message
+    })
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -57,11 +69,14 @@ def init_db():
 def run_scan_in_background(scan_id, package_name, ecosystem, skip_reputation=False, skip_static=False, skip_dynamic=False):
     """
     Executes the reputation, static, and dynamic scan, then updates the database.
+    Emits SSE-compatible progress events into _progress[scan_id] as each phase completes.
     """
+    _progress[scan_id] = []
     try:
-        # 1. Reputation
+        # ── Phase 1: Reputation ───────────────────────────────────────────────
+        _emit(scan_id, "reputation", "running", "Querying PyPI registry and OSV vulnerability database…")
         rep_results = scan_reputation(package_name, ecosystem)
-        
+
         if skip_reputation:
             rep_results["vulnerabilities"] = []
             rep_results["typosquatting_detected"] = False
@@ -71,59 +86,112 @@ def run_scan_in_background(scan_id, package_name, ecosystem, skip_reputation=Fal
 
         if not rep_results.get("exists"):
             if rep_results.get("typosquatting_detected"):
-                # Package doesn't exist but typosquatting detected — still score it
-                static_results = {"typosquatting": rep_results.get("typosquatting_info"), "alerts": [], "files_scanned": 0, "obfuscation_detected": False, "dangerous_ast_detected": False, "success": False}
-                dynamic_results = {"docker_available": False, "events": []}
-                # Fix for calculate_score requiring package_name
+                _emit(scan_id, "reputation", "warn", "Package not found — possible typosquatting detected")
+                typo_info   = rep_results.get("typosquatting_info") or {}
+                typo_target = typo_info.get("target", "a known package")
+                typo_dist   = typo_info.get("distance", "?")
+                typo_msg    = typo_info.get("message", "")
+                # Surface typosquatting as a real finding so it appears in the Static tab
+                typo_finding = {
+                    "type":             "typosquatting",
+                    "severity":         "high",
+                    "confidence":       "High",
+                    "mitre_id":         "T1195.001",
+                    "mitre_technique":  "Compromise Software Dependencies and Development Tools",
+                    "message":          (
+                        f"'{package_name}' does not exist on PyPI but is suspiciously similar to the popular "
+                        f"package '{typo_target}' (edit distance: {typo_dist}). "
+                        f"Attackers register near-identical names to intercept installs via typos. "
+                        f"Original signal: {typo_msg}"
+                    ),
+                    "file":    "PyPI Registry (name-similarity analysis)",
+                    "line":    0,
+                    "compliance": ["NIST SP 800-161 SA-12", "NIS2 Directive Art.21", "DORA Art.5"],
+                }
+                static_results  = {
+                    "typosquatting": typo_info,
+                    "alerts":        [typo_finding],
+                    "files_scanned": 0,
+                    "obfuscation_detected":   False,
+                    "dangerous_ast_detected": False,
+                    "success": False,
+                }
+                dynamic_results = {
+                    "docker_available": False,
+                    "events": [{
+                        "type":    "INSTALL_BLOCKED",
+                        "details": (
+                            f"pip install {package_name} → No matching distribution found. "
+                            f"Package does not exist on PyPI — installation was blocked at the registry level. "
+                            f"Likely typosquat of '{typo_target}'."
+                        ),
+                    }],
+                }
                 score_data = calculate_score(package_name, rep_results, static_results, dynamic_results)
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE scans SET version = 'N/A', score = ?, risk_level = ?, reputation_data = ?, static_data = ?, dynamic_data = ?, reasons = ? WHERE id = ?
-                """, (score_data["score"], score_data["risk_level"], json.dumps(rep_results), json.dumps(static_results), json.dumps(dynamic_results), json.dumps(score_data["reasons"]), scan_id))
-                conn.commit()
-                conn.close()
+                conn = get_db_connection(); cursor = conn.cursor()
+                cursor.execute("UPDATE scans SET version='N/A', score=?, risk_level=?, reputation_data=?, static_data=?, dynamic_data=?, reasons=? WHERE id=?",
+                    (score_data["score"], score_data["risk_level"], json.dumps(rep_results), json.dumps(static_results), json.dumps(dynamic_results), json.dumps(score_data["reasons"]), scan_id))
+                conn.commit(); conn.close()
+                _emit(scan_id, "complete", "done", f"Score: {score_data['score']}/100 — {score_data['risk_level']}")
                 return
             error_msg = rep_results.get("error", "Package not found")
+            _emit(scan_id, "reputation", "error", error_msg)
+            _emit(scan_id, "complete",   "error", "Scan failed")
             update_scan_failed(scan_id, error_msg)
             return
 
-        # 2. Static
-        download_url = rep_results.get("download_url")
+        vuln_count = len(rep_results.get("vulnerabilities", []))
+        ver        = rep_results.get("version", "?")
+        _emit(scan_id, "reputation", "done",
+              f"v{ver} · {rep_results.get('releases_count', 0)} releases · {vuln_count} CVE{'s' if vuln_count != 1 else ''}")
+
+        # ── Phase 2: Static ───────────────────────────────────────────────────
+        download_url   = rep_results.get("download_url")
         static_results = {"success": True, "files_scanned": 0, "alerts": [], "obfuscation_detected": False, "dangerous_ast_detected": False}
         if not skip_static:
+            _emit(scan_id, "static", "running", "Downloading source archive and running AST / YARA analysis…")
             static_results = scan_static(package_name, ecosystem, download_url)
+            alert_count    = len(static_results.get("alerts", []))
+            files_scanned  = static_results.get("files_scanned", 0)
+            _emit(scan_id, "static", "done" if alert_count == 0 else "warn",
+                  f"{files_scanned} files scanned · {alert_count} alert{'s' if alert_count != 1 else ''} found")
+        else:
+            _emit(scan_id, "static", "skip", "Static analysis skipped")
 
-        # 3. Dynamic
+        # ── Phase 3: Dynamic ──────────────────────────────────────────────────
         dynamic_results = {"docker_available": False, "events": []}
         if not skip_dynamic:
-            # Bug fix: scan_dynamic needs download_url as 3rd arg in the API? Wait, the runner takes (package_name, ecosystem, archive_url)
-            # In app.py it was `scan_dynamic(package_name, ecosystem)`. Let's fix that too.
+            _emit(scan_id, "dynamic", "running", "Spawning network-isolated Docker sandbox…")
             dynamic_results = scan_dynamic(package_name, ecosystem, download_url)
+            event_count     = len(dynamic_results.get("events", []))
+            if dynamic_results.get("error"):
+                _emit(scan_id, "dynamic", "warn", f"Sandbox warning: {dynamic_results['error']}")
+            else:
+                _emit(scan_id, "dynamic", "done" if event_count == 0 else "warn",
+                      f"Sandbox complete · {event_count} suspicious event{'s' if event_count != 1 else ''}")
+        else:
+            _emit(scan_id, "dynamic", "skip", "Sandbox skipped")
 
-        # 4. Scorer
+        # ── Phase 4: Scoring ──────────────────────────────────────────────────
+        _emit(scan_id, "scoring", "running", "Calculating combined risk score…")
         score_data = calculate_score(package_name, rep_results, static_results, dynamic_results)
+        _emit(scan_id, "scoring", "done", f"Score: {score_data['score']}/100 — {score_data['risk_level']}")
 
-        # Update SQLite with success
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        # ── Persist ───────────────────────────────────────────────────────────
+        conn = get_db_connection(); cursor = conn.cursor()
         cursor.execute("""
             UPDATE scans
-            SET version = ?, score = ?, risk_level = ?, reputation_data = ?, static_data = ?, dynamic_data = ?, reasons = ?
-            WHERE id = ?
-        """, (
-            rep_results.get("version"),
-            score_data["score"],
-            score_data["risk_level"],
-            json.dumps(rep_results),
-            json.dumps(static_results),
-            json.dumps(dynamic_results),
-            json.dumps(score_data["reasons"]),
-            scan_id
-        ))
-        conn.commit()
-        conn.close()
+            SET version=?, score=?, risk_level=?, reputation_data=?, static_data=?, dynamic_data=?, reasons=?
+            WHERE id=?
+        """, (rep_results.get("version"), score_data["score"], score_data["risk_level"],
+              json.dumps(rep_results), json.dumps(static_results), json.dumps(dynamic_results),
+              json.dumps(score_data["reasons"]), scan_id))
+        conn.commit(); conn.close()
+
+        _emit(scan_id, "complete", "done", f"Analysis complete — {score_data['risk_level']} risk")
+
     except Exception as e:
+        _emit(scan_id, "complete", "error", f"Internal error: {str(e)}")
         update_scan_failed(scan_id, f"Internal Error: {str(e)}")
 
 def update_scan_failed(scan_id, error_msg):
@@ -136,6 +204,22 @@ def update_scan_failed(scan_id, error_msg):
     """, (json.dumps([f"Scan failed: {error_msg}"]), scan_id))
     conn.commit()
     conn.close()
+
+@app.before_request
+def strip_conditional_for_static():
+    """Strip If-None-Match / If-Modified-Since so Flask never returns 304 for static files."""
+    if request.path.startswith('/static/'):
+        request.environ.pop('HTTP_IF_NONE_MATCH', None)
+        request.environ.pop('HTTP_IF_MODIFIED_SINCE', None)
+
+@app.after_request
+def no_cache_static(response):
+    """Tell the browser not to cache static files."""
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
 
 @app.route("/")
 def index():
@@ -330,6 +414,140 @@ def get_stats():
         "high_risk_count": row["high_count"] or 0,
         "safe_count": row["safe_count"] or 0
     })
+
+@app.route("/api/findings", methods=["GET"])
+def get_findings():
+    """All static analysis findings across all completed scans, with optional filters."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, package_name, ecosystem, version, scanned_at, static_data
+        FROM scans WHERE score >= 0 AND static_data IS NOT NULL
+        ORDER BY scanned_at DESC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    findings = []
+    for row in rows:
+        static = json.loads(row["static_data"]) if row["static_data"] else {}
+        for a in static.get("alerts", []):
+            findings.append({
+                "scan_id":      row["id"],
+                "package_name": row["package_name"],
+                "ecosystem":    row["ecosystem"],
+                "version":      row["version"],
+                "scanned_at":   row["scanned_at"],
+                **a
+            })
+
+    sev = request.args.get("severity")
+    ftype = request.args.get("type")
+    pkg = request.args.get("package")
+    if sev:   findings = [f for f in findings if f.get("severity") == sev]
+    if ftype: findings = [f for f in findings if f.get("type") == ftype]
+    if pkg:   findings = [f for f in findings if pkg.lower() in f.get("package_name", "").lower()]
+
+    return jsonify(findings)
+
+
+@app.route("/api/inventory", methods=["GET"])
+def get_inventory():
+    """Package inventory — one row per unique (name, ecosystem) with score history."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='package_inventory'")
+    if not cursor.fetchone():
+        conn.close()
+        return jsonify([])
+    cursor.execute("""
+        SELECT package_name, ecosystem, first_seen, last_seen, last_version,
+               last_score, last_risk_level, scan_count, score_history
+        FROM package_inventory ORDER BY last_seen DESC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return jsonify([{
+        "package_name":   r["package_name"],
+        "ecosystem":      r["ecosystem"],
+        "first_seen":     r["first_seen"],
+        "last_seen":      r["last_seen"],
+        "last_version":   r["last_version"],
+        "last_score":     r["last_score"],
+        "last_risk_level":r["last_risk_level"],
+        "scan_count":     r["scan_count"],
+        "score_history":  json.loads(r["score_history"]) if r["score_history"] else []
+    } for r in rows])
+
+
+@app.route("/api/scan/bulk", methods=["POST"])
+def bulk_scan():
+    """Parse requirements.txt content and start background scans for every package."""
+    data = request.json or {}
+    content  = data.get("content", "")
+    ecosystem = data.get("ecosystem", "pypi").lower()
+    if not content:
+        return jsonify({"error": "No content provided"}), 400
+
+    scan_ids = []
+    for line in content.strip().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        pkg_name = re.split(r'[>=<!=\[\];@ ]', line)[0].strip()
+        if not pkg_name:
+            continue
+        init_db()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO scans (package_name, ecosystem, risk_level, reasons) VALUES (?,?,'Scanning',?)",
+            (pkg_name, ecosystem, json.dumps(["Scanning package in background..."]))
+        )
+        scan_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        threading.Thread(target=run_scan_in_background,
+                         args=(scan_id, pkg_name, ecosystem, False, False, False)).start()
+        scan_ids.append({"package": pkg_name, "scan_id": scan_id})
+
+    return jsonify({"scans": scan_ids, "total": len(scan_ids)})
+
+
+@app.route("/api/scan/<int:scan_id>/stream", methods=["GET"])
+def scan_stream(scan_id):
+    """
+    SSE endpoint — streams progress events for a running scan.
+    Each event is a JSON object: {phase, status, message}.
+    Closes automatically when phase=='complete' or after a 3-minute timeout.
+    """
+    @stream_with_context
+    def generate():
+        seen     = 0
+        deadline = _time.time() + 180  # 3-minute hard timeout
+        while _time.time() < deadline:
+            events = _progress.get(scan_id, [])
+            while seen < len(events):
+                evt = events[seen]
+                yield f"data: {json.dumps(evt)}\n\n"
+                seen += 1
+                if evt.get("phase") == "complete":
+                    return
+            _time.sleep(0.3)
+        yield f"data: {json.dumps({'phase':'complete','status':'error','message':'Scan timed out'})}\n\n"
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control":     "no-cache",
+            "X-Accel-Buffering": "no",   # disable nginx buffering if behind a proxy
+            "Connection":        "keep-alive",
+        }
+    )
+
 
 @app.route("/api/status", methods=["GET"])
 def check_status():

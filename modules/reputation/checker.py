@@ -5,6 +5,7 @@ import tarfile
 import tempfile
 import shutil
 import re
+import sqlite3
 from datetime import datetime
 from packaging.version import parse as parse_version
 import Levenshtein
@@ -406,12 +407,45 @@ def scan_reputation(package_name, ecosystem="pypi"):
     meta["version_diff"] = diff
     
     # Known malware database indicator
-    # E.g. matches OSV critical malware reports or is explicitly flagged
     meta["known_malicious"] = False
     for v in vulns:
         details = v.get("details", "").lower()
         summary = v.get("summary", "").lower()
         if "malicious" in details or "malware" in details or "malicious" in summary or "malware" in summary:
             meta["known_malicious"] = True
-            
+
+    # Maintainer change detection
+    meta["maintainer_changed"] = False
+    meta["previous_maintainer_email"] = None
+    try:
+        db_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "data", "depthcharge.db"
+        )
+        if os.path.exists(db_path):
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            # Look up the most recent stored author_email for this package
+            cur.execute(
+                "SELECT reputation_data FROM scans WHERE package_name=? AND ecosystem=? "
+                "ORDER BY scanned_at DESC LIMIT 1",
+                (package_name, ecosystem)
+            )
+            row = cur.fetchone()
+            conn.close()
+            if row:
+                prev_rep = json.loads(row["reputation_data"])
+                prev_email = prev_rep.get("author_email", "")
+                curr_email = meta.get("author_email", "")
+                if (
+                    prev_email and curr_email and
+                    prev_email != "Unknown" and curr_email != "Unknown" and
+                    prev_email.lower() != curr_email.lower()
+                ):
+                    meta["maintainer_changed"] = True
+                    meta["previous_maintainer_email"] = prev_email
+    except Exception:
+        pass
+
     return meta

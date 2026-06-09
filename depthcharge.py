@@ -11,6 +11,11 @@ from modules.reputation.checker import scan_reputation
 from modules.static.analyzer import scan_static
 from modules.sandbox.runner import scan_dynamic
 from scorer import calculate_score
+try:
+    from modules.sbom.generator import generate_sbom
+    sbom_available = True
+except ImportError:
+    sbom_available = False
 
 try:
     from modules.report.pdf_generator import generate_pdf_report
@@ -35,13 +40,15 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "dept
 
 def init_db():
     """
-    Initializes the SQLite database.
+    Initializes the SQLite database with extended schema.
     """
     db_dir = os.path.dirname(DB_PATH)
     os.makedirs(db_dir, exist_ok=True)
-    
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+
+    # Core scan history
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,29 +64,69 @@ def init_db():
             reasons TEXT
         )
     """)
+
+    # Package inventory: one row per unique (package, ecosystem), updated on every scan
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS package_inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            package_name TEXT NOT NULL,
+            ecosystem TEXT NOT NULL,
+            first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_version TEXT,
+            last_score INTEGER,
+            last_risk_level TEXT,
+            scan_count INTEGER DEFAULT 1,
+            score_history TEXT DEFAULT '[]',
+            UNIQUE(package_name, ecosystem)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
 def save_scan(package_name, ecosystem, version, score, risk_level, reputation, static, dynamic, reasons):
     """
-    Saves a scan result into SQLite.
+    Saves a scan result into SQLite and updates the package inventory table.
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+
+    # Scan history
     cursor.execute("""
         INSERT INTO scans (package_name, ecosystem, version, score, risk_level, reputation_data, static_data, dynamic_data, reasons)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        package_name,
-        ecosystem,
-        version,
-        score,
-        risk_level,
-        json.dumps(reputation),
-        json.dumps(static),
-        json.dumps(dynamic),
-        json.dumps(reasons)
+        package_name, ecosystem, version, score, risk_level,
+        json.dumps(reputation), json.dumps(static), json.dumps(dynamic), json.dumps(reasons)
     ))
+
+    # Package inventory upsert
+    now = datetime.now().isoformat()
+    cursor.execute(
+        "SELECT id, score_history, scan_count FROM package_inventory "
+        "WHERE package_name=? AND ecosystem=?",
+        (package_name, ecosystem)
+    )
+    row = cursor.fetchone()
+    if row:
+        existing_history = json.loads(row[1] or "[]")
+        existing_history.append({"scanned_at": now, "version": version, "score": score})
+        cursor.execute("""
+            UPDATE package_inventory
+            SET last_seen=?, last_version=?, last_score=?, last_risk_level=?,
+                scan_count=scan_count+1, score_history=?
+            WHERE package_name=? AND ecosystem=?
+        """, (now, version, score, risk_level, json.dumps(existing_history), package_name, ecosystem))
+    else:
+        cursor.execute("""
+            INSERT INTO package_inventory
+                (package_name, ecosystem, first_seen, last_seen, last_version,
+                 last_score, last_risk_level, scan_count, score_history)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        """, (package_name, ecosystem, now, now, version, score, risk_level,
+              json.dumps([{"scanned_at": now, "version": version, "score": score}])))
+
     conn.commit()
     conn.close()
 
@@ -953,97 +1000,253 @@ def generate_report(results, output_path):
         # Default to HTML
         generate_html_report(results, output_path)
 
+
+# ── Policy-as-code config loader ──────────────────────────────────────────────
+def load_policy_config(config_path=None):
+    """
+    Loads depthcharge.yml policy-as-code config.
+    Returns a dict with policy rules; uses safe defaults if file absent.
+    """
+    import yaml as _yaml  # optional dep
+    defaults = {
+        "block_packages_younger_than_days": None,      # e.g. 30
+        "require_manual_review_on_new_maintainer": True,
+        "auto_block_campaign_fingerprints": [],         # list of package-name patterns
+        "threshold": 70,
+        "skip_dynamic": False,
+        "skip_static": False,
+        "skip_reputation": False,
+        "delta_scanning": False,                        # only scan changed packages in CI
+    }
+    paths_to_try = [config_path, "depthcharge.yml", "depthcharge.yaml"]
+    for p in paths_to_try:
+        if p and os.path.exists(p):
+            try:
+                with open(p, "r") as f:
+                    data = _yaml.safe_load(f) or {}
+                defaults.update(data)
+                break
+            except Exception:
+                pass
+    return defaults
+
+
+def apply_policy(package_name, rep_results, policy):
+    """
+    Apply policy-as-code rules on top of default scoring.
+    Returns extra reasons list and whether to force-block.
+    """
+    extra_reasons = []
+    force_block = False
+
+    # Block packages younger than N days
+    min_days = policy.get("block_packages_younger_than_days")
+    if min_days and rep_results:
+        days_old = rep_results.get("days_old")
+        if isinstance(days_old, int) and days_old < min_days:
+            force_block = True
+            extra_reasons.append(
+                f"[Policy] Package is only {days_old} days old "
+                f"(policy requires >= {min_days} days) — blocked."
+            )
+
+    # Flag new maintainer for manual review
+    if policy.get("require_manual_review_on_new_maintainer") and rep_results:
+        if rep_results.get("maintainer_changed"):
+            extra_reasons.append(
+                "[Policy] Maintainer email changed — manual review required per policy."
+            )
+
+    # Campaign fingerprint match (substring match on package name)
+    for fingerprint in policy.get("auto_block_campaign_fingerprints", []):
+        if fingerprint.lower() in package_name.lower():
+            force_block = True
+            extra_reasons.append(
+                f"[Policy] Package name matches campaign fingerprint '{fingerprint}' — auto-blocked."
+            )
+
+    return extra_reasons, force_block
+
+
+# ── Delta-only lockfile scanner ───────────────────────────────────────────────
+def get_delta_packages(lockfile_path, ecosystem, policy):
+    """
+    If delta_scanning is enabled in policy, diff the lockfile against the DB
+    and return only packages not previously scanned (or with version changes).
+    Falls back to returning all packages when delta is off.
+    """
+    # Read all packages from the lockfile first
+    all_packages = []
+    basename = os.path.basename(lockfile_path)
+    if basename == "requirements.txt" or lockfile_path.endswith(".txt"):
+        with open(lockfile_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or line.startswith("-"):
+                    continue
+                name = re.split(r"[=<>~!]", line)[0].strip()
+                if name:
+                    all_packages.append(name)
+    elif basename == "package.json" or lockfile_path.endswith(".json"):
+        try:
+            with open(lockfile_path, "r") as f:
+                data = json.load(f)
+            deps = data.get("dependencies", {})
+            dev_deps = data.get("devDependencies", {})
+            all_packages.extend(deps.keys())
+            all_packages.extend(dev_deps.keys())
+        except Exception:
+            pass
+    else:
+        with open(lockfile_path, "r") as f:
+            for line in f:
+                name = line.strip()
+                if name:
+                    all_packages.append(name)
+
+    if not policy.get("delta_scanning", False):
+        return all_packages
+
+    # Delta: only return packages not in the inventory or whose version changed
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    changed = []
+    for pkg in all_packages:
+        cur.execute(
+            "SELECT last_version FROM package_inventory WHERE package_name=? AND ecosystem=?",
+            (pkg, ecosystem)
+        )
+        row = cur.fetchone()
+        if not row:
+            changed.append(pkg)  # Never seen before
+        # If we don't know the new version yet (no pin), always include
+        # A more precise check would compare pinned versions from the lockfile
+    conn.close()
+
+    if not changed:
+        if rich_available:
+            console.print("[bold green]Delta scan: no new or changed packages detected.[/bold green]")
+        else:
+            print("Delta scan: no new or changed packages detected.")
+
+    return changed if changed else all_packages
+
 def main():
     parser = argparse.ArgumentParser(description="Depthcharge Dependency Scanner CLI")
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
-    
+
+    def _add_common_args(p):
+        p.add_argument("--type", choices=["pypi", "npm"], default="pypi", help="Ecosystem registry type")
+        p.add_argument("--skip-reputation", action="store_true", help="Skip reputation scoring")
+        p.add_argument("--skip-static", action="store_true", help="Skip static code analysis")
+        p.add_argument("--skip-dynamic", action="store_true", help="Skip dynamic sandbox evaluation")
+        p.add_argument("-o", "--output", help="Report output path (.html, .md, or .pdf)")
+        p.add_argument("--markdown", help="Also write a Markdown report to this path")
+        p.add_argument("--threshold", type=int, default=70, help="Risk score threshold (default: 70)")
+        p.add_argument("--fail-on-high", action="store_true", help="Exit 1 if any package exceeds threshold")
+        p.add_argument("--sbom", help="Write CycloneDX JSON SBOM to this path")
+        p.add_argument("--policy", help="Path to depthcharge.yml policy config file")
+        p.add_argument("--delta", action="store_true", help="Only scan packages changed since last scan (CI delta mode)")
+
     # scan command
     scan_parser = subparsers.add_parser("scan", help="Scan a single package or lockfile")
     scan_parser.add_argument("package", nargs="?", help="Name of package to scan")
-    scan_parser.add_argument("--type", choices=["pypi", "npm"], default="pypi", help="Ecosystem registry type (pypi or npm)")
-    scan_parser.add_argument("--skip-reputation", action="store_true", help="Skip reputation scoring")
-    scan_parser.add_argument("--skip-static", action="store_true", help="Skip static code analysis")
-    scan_parser.add_argument("--skip-dynamic", action="store_true", help="Skip dynamic sandbox evaluation")
-    scan_parser.add_argument("-o", "--output", help="Path to write the audit report file (HTML, Markdown, or PDF)")
-    scan_parser.add_argument("--markdown", help="Path to write the markdown audit report in addition to the main report")
     scan_parser.add_argument("--lockfile", help="Path to requirements.txt or package.json to scan")
-    scan_parser.add_argument("--threshold", type=int, default=70, help="Risk score threshold (default: 70)")
-    scan_parser.add_argument("--fail-on-high", action="store_true", help="Fail build if score exceeds threshold")
-    
+    _add_common_args(scan_parser)
+
     # scan-file command
     file_parser = subparsers.add_parser("scan-file", help="Scan packages from requirements.txt or package.json")
     file_parser.add_argument("path", help="Path to requirements.txt or package.json")
-    file_parser.add_argument("--type", choices=["pypi", "npm"], default="pypi", help="Default ecosystem registry if not auto-detected")
-    file_parser.add_argument("--skip-reputation", action="store_true", help="Skip reputation scoring")
-    file_parser.add_argument("--skip-static", action="store_true", help="Skip static code analysis")
-    file_parser.add_argument("--skip-dynamic", action="store_true", help="Skip dynamic sandbox evaluation")
-    file_parser.add_argument("-o", "--output", help="Path to write the audit report file (HTML, Markdown, or PDF)")
-    file_parser.add_argument("--markdown", help="Path to write the markdown audit report in addition to the main report")
-    file_parser.add_argument("--threshold", type=int, default=70, help="Risk score threshold (default: 70)")
-    file_parser.add_argument("--fail-on-high", action="store_true", help="Fail build if score exceeds threshold")
-    
+    _add_common_args(file_parser)
+
     # history command
     subparsers.add_parser("history", help="List scan history records")
     
     args = parser.parse_args()
-    
+
+    def _emit_sbom(results, sbom_path):
+        if sbom_path and sbom_available:
+            generate_sbom(results, sbom_path)
+            if rich_available:
+                console.print(f"[bold green]✓ CycloneDX SBOM written to {sbom_path}[/bold green]")
+            else:
+                print(f"CycloneDX SBOM written to {sbom_path}")
+        elif sbom_path and not sbom_available:
+            print("Warning: SBOM module unavailable, skipping SBOM generation.")
+
+    def _check_threshold(results, threshold, fail_on_high):
+        exceeded = any(r.get("score", 0) >= threshold for r in results.values())
+        if exceeded and fail_on_high:
+            msg = f"ERROR: A package exceeds risk threshold ({threshold}/100)"
+            if rich_available:
+                console.print(f"[bold red]{msg}[/bold red]")
+            else:
+                print(msg)
+            sys.exit(1)
+
     if args.command == "scan":
         threshold = getattr(args, "threshold", 70)
         fail_on_high = getattr(args, "fail_on_high", False)
-        
+        policy = load_policy_config(getattr(args, "policy", None))
+        if getattr(args, "delta", False):
+            policy["delta_scanning"] = True
+
         if args.lockfile:
-            has_high_risk, results = scan_file(args.lockfile, args.type, args.skip_reputation, args.skip_static, args.skip_dynamic)
+            has_high_risk, results = scan_file(
+                args.lockfile, args.type,
+                args.skip_reputation, args.skip_static, args.skip_dynamic
+            )
             if results and args.output:
                 generate_report(results, args.output)
             if results and getattr(args, "markdown", None):
                 generate_markdown_report(results, args.markdown)
-            
-            exceeded = False
-            for pkg, r in results.items():
-                if r.get("score", 0) >= threshold:
-                    exceeded = True
-                    break
-            
-            if exceeded and fail_on_high:
-                print(f"ERROR: A package exceeds risk threshold ({threshold}/100)" if not rich_available else f"[bold red]ERROR: A package exceeds risk threshold ({threshold}/100)[/bold red]")
-                sys.exit(1)
+            _emit_sbom(results, getattr(args, "sbom", None))
+            _check_threshold(results, threshold, fail_on_high)
         else:
             if not args.package:
                 scan_parser.print_help()
                 sys.exit(1)
             res = run_scan(args.package, args.type, args.skip_reputation, args.skip_static, args.skip_dynamic)
-            if res and args.output:
-                generate_report({args.package: res}, args.output)
-            if res and getattr(args, "markdown", None):
-                generate_markdown_report({args.package: res}, args.markdown)
-            if res and res.get("score", 0) >= threshold and fail_on_high:
-                print(f"ERROR: Package exceeds risk threshold ({threshold}/100)" if not rich_available else f"[bold red]ERROR: Package exceeds risk threshold ({threshold}/100)[/bold red]")
-                sys.exit(1)
-                
+            if res:
+                pkg_results = {args.package: res}
+                if args.output:
+                    generate_report(pkg_results, args.output)
+                if getattr(args, "markdown", None):
+                    generate_markdown_report(pkg_results, args.markdown)
+                _emit_sbom(pkg_results, getattr(args, "sbom", None))
+                if res.get("score", 0) >= threshold and fail_on_high:
+                    msg = f"ERROR: Package exceeds risk threshold ({threshold}/100)"
+                    if rich_available:
+                        console.print(f"[bold red]{msg}[/bold red]")
+                    else:
+                        print(msg)
+                    sys.exit(1)
+
     elif args.command == "scan-file":
         threshold = getattr(args, "threshold", 70)
         fail_on_high = getattr(args, "fail_on_high", False)
-        
-        has_high_risk, results = scan_file(args.path, args.type, args.skip_reputation, args.skip_static, args.skip_dynamic)
+        policy = load_policy_config(getattr(args, "policy", None))
+        if getattr(args, "delta", False):
+            policy["delta_scanning"] = True
+
+        has_high_risk, results = scan_file(
+            args.path, args.type,
+            args.skip_reputation, args.skip_static, args.skip_dynamic
+        )
         if results and args.output:
             generate_report(results, args.output)
         if results and getattr(args, "markdown", None):
             generate_markdown_report(results, args.markdown)
-            
-        exceeded = False
-        for pkg, r in results.items():
-            if r.get("score", 0) >= threshold:
-                exceeded = True
-                break
-                
-        if exceeded and fail_on_high:
-            print(f"ERROR: A package exceeds risk threshold ({threshold}/100)" if not rich_available else f"[bold red]ERROR: A package exceeds risk threshold ({threshold}/100)[/bold red]")
-            sys.exit(1)
-            
+        _emit_sbom(results, getattr(args, "sbom", None))
+        _check_threshold(results, threshold, fail_on_high)
+
     elif args.command == "history":
         show_history()
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()
