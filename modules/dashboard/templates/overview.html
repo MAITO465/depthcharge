@@ -1,0 +1,287 @@
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW: OVERVIEW
+════════════════════════════════════════════════════════════ -->
+<div id="view-overview" class="view active">
+
+  <!-- ── Full-Viewport Hero ──────────────────────────────────── -->
+  <section class="dc-hero">
+    <div class="dc-hero-inner">
+
+      <!-- Copy column -->
+      <div class="dc-hero-copy">
+        <div class="dc-hero-eyebrow">
+          <span class="dc-eyebrow-dot"></span>
+          Supply Chain Security Platform
+        </div>
+
+        <h1 class="dc-hero-title">
+          Know what's in<br>
+          every package<br>
+          <span class="dc-title-accent">before it ships.</span>
+        </h1>
+
+        <p class="dc-hero-sub">
+          Depthcharge performs static analysis, dynamic sandbox execution,
+          and reputation intelligence on Python and npm dependencies —
+          detecting malware, typosquatting, and supply chain attacks
+          before they reach production.
+        </p>
+
+        <div class="dc-hero-btns">
+          <button class="btn-primary btn-hero" onclick="navigate('scanner')">
+            <i class="fa-solid fa-bolt"></i> Analyze a Package
+          </button>
+          <button class="btn-ghost" onclick="navigate('findings')">
+            View Findings <i class="fa-solid fa-arrow-right" style="font-size:10px;margin-left:2px;"></i>
+          </button>
+        </div>
+
+        <div class="dc-hero-meta">
+          <span>PyPI</span>
+          <span class="dc-meta-sep">·</span>
+          <span>npm</span>
+          <span class="dc-meta-sep">·</span>
+          <span>MITRE ATT&amp;CK</span>
+          <span class="dc-meta-sep">·</span>
+          <span>CVE Intel</span>
+          <span class="dc-meta-sep">·</span>
+          <span>Docker Sandbox</span>
+        </div>
+      </div>
+
+      <!-- Visualization column -->
+      <div class="dc-hero-viz">
+        <canvas id="viz-canvas"></canvas>
+      </div>
+
+    </div>
+
+    <!-- Scroll cue -->
+    <div class="dc-scroll-hint">
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+  </section>
+
+  <!-- ── KPI Strip ───────────────────────────────────────────── -->
+  <div class="dc-kpi-strip">
+    <div class="container-xl">
+      <div class="row g-3">
+        <div class="col-6 col-md-3">
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-label">Total Scans</div>
+            <div class="kpi-value" id="kpi-total">0</div>
+            <div class="kpi-sublabel">packages analyzed</div>
+            <i class="bi bi-bar-chart-fill kpi-icon"></i>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-label">High Risk</div>
+            <div class="kpi-value" id="kpi-high">0</div>
+            <div class="kpi-sublabel">threats detected</div>
+            <i class="bi bi-exclamation-triangle-fill kpi-icon"></i>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-label">Avg Risk Score</div>
+            <div class="kpi-value" id="kpi-avg">0</div>
+            <div class="kpi-sublabel">out of 100</div>
+            <i class="bi bi-speedometer2 kpi-icon"></i>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-label">Clean Packages</div>
+            <div class="kpi-value" id="kpi-safe">0</div>
+            <div class="kpi-sublabel">no threats found</div>
+            <i class="bi bi-check-circle-fill kpi-icon"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Charts + Recent Threats ────────────────────────────── -->
+  <div class="container-xl py-4">
+    <div class="row g-4 mb-4">
+
+      <!-- Donut -->
+      <div class="col-lg-4">
+        <div class="card chart-card h-100">
+          <div class="card-header">
+            <span class="card-title">
+              <i class="bi bi-pie-chart-fill me-2" style="color:var(--blue);"></i>Risk Distribution
+            </span>
+          </div>
+          <div style="padding:16px;">
+            <div class="donut-wrap" style="height:180px;">
+              <canvas id="chart-donut" width="180" height="180"></canvas>
+              <div class="donut-center" id="donut-center-text">
+                <span class="donut-big">0</span>
+                <span class="donut-small">scans</span>
+              </div>
+            </div>
+            <div class="donut-legend">
+              <span><span class="legend-dot danger"></span>High</span>
+              <span><span class="legend-dot warning"></span>Medium</span>
+              <span><span class="legend-dot safe"></span>Low</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Line chart -->
+      <div class="col-lg-8">
+        <div class="card chart-card-wide h-100">
+          <div class="card-header">
+            <span class="card-title">
+              <i class="bi bi-graph-up me-2" style="color:var(--blue);"></i>Scan Activity — last 20
+            </span>
+          </div>
+          <div class="line-wrap">
+            <canvas id="chart-line"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Recent threats table -->
+    <div class="card mb-0">
+      <div class="card-header d-flex align-items-center">
+        <span class="card-title">
+          <i class="bi bi-shield-exclamation me-2" style="color:var(--blue);"></i>Recent High-Risk Packages
+        </span>
+        <button class="btn-link ms-auto" onclick="navigate('scanner')">View all →</button>
+      </div>
+      <div id="recent-threats-list" style="padding:0 4px;">
+        <div class="empty-msg">
+          <i class="bi bi-shield-check" style="font-size:28px;color:var(--surface-3);margin-bottom:8px;display:block;"></i>
+          <p>No high-risk packages detected yet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Capabilities ────────────────────────────────────────── -->
+  <div class="feature-section">
+    <div class="container-xl">
+      <div class="row g-0 mb-5">
+        <div class="col-lg-7">
+          <h2 class="feature-section-title">Everything required for<br>supply chain security.</h2>
+          <p class="feature-section-sub">
+            From package reputation analysis to dynamic malware detection, Depthcharge gives
+            you full visibility into every dependency before it reaches your codebase.
+          </p>
+        </div>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+          <div class="feature-card">
+            <div class="feature-icon blue"><i class="bi bi-shield-check"></i></div>
+            <div class="feature-title">Package Reputation</div>
+            <p class="feature-desc">Analyze maintainers, releases, ownership changes, and ecosystem trust signals to detect suspicious packages.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="feature-card">
+            <div class="feature-icon blue"><i class="bi bi-code-slash"></i></div>
+            <div class="feature-title">Static AST Analysis</div>
+            <p class="feature-desc">Detect obfuscation, dangerous APIs, credential leaks, and suspicious taint flows in package source code.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="feature-card">
+            <div class="feature-icon blue"><i class="bi bi-terminal"></i></div>
+            <div class="feature-title">Dynamic Sandbox</div>
+            <p class="feature-desc">Observe runtime behavior including network activity, process spawning, and filesystem modifications in isolation.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="feature-card">
+            <div class="feature-icon blue"><i class="bi bi-diagram-3"></i></div>
+            <div class="feature-title">MITRE ATT&amp;CK Mapping</div>
+            <p class="feature-desc">Map findings to attacker techniques and real-world supply chain threat behaviors automatically.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="feature-card">
+            <div class="feature-icon blue"><i class="bi bi-clipboard2-check"></i></div>
+            <div class="feature-title">Compliance Alignment</div>
+            <p class="feature-desc">Cross-reference findings against NIST SP 800-161, NIS2, and DORA supply chain controls.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="feature-card">
+            <div class="feature-icon blue"><i class="bi bi-speedometer2"></i></div>
+            <div class="feature-title">Risk Scoring Engine</div>
+            <p class="feature-desc">Generate actionable 0–100 risk scores and Clear / Suspicious / Malware verdicts for every analyzed package.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="feature-card">
+            <div class="feature-icon blue"><i class="bi bi-bug"></i></div>
+            <div class="feature-title">CVE Intelligence</div>
+            <p class="feature-desc">Identify known vulnerabilities affecting analyzed dependencies via OSV and NVD enrichment.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="feature-card">
+            <div class="feature-icon blue"><i class="bi bi-file-earmark-text"></i></div>
+            <div class="feature-title">Executive Reporting</div>
+            <p class="feature-desc">Export professional PDF audit reports for stakeholders, security reviews, and compliance documentation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Team ────────────────────────────────────────────────── -->
+  <div class="team-section">
+    <div class="container-xl">
+      <div class="text-center mb-5">
+        <h2 class="feature-section-title">Built By Security Engineers</h2>
+        <p class="feature-section-sub mx-auto" style="max-width:520px;">
+          Designed as an advanced software supply chain security research platform focused on
+          detecting malicious Python packages and modern dependency threats.
+        </p>
+      </div>
+      <div class="row g-4 justify-content-center">
+        <div class="col-md-6 col-lg-3">
+          <div class="team-card">
+            <div class="team-avatar dc-av-1">R</div>
+            <div class="team-name">Team Member 1</div>
+            <div class="team-role">Security Research Lead</div>
+            <p class="team-desc">Focused on supply chain threat detection and malicious package attribution techniques.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="team-card">
+            <div class="team-avatar dc-av-2">A</div>
+            <div class="team-name">Team Member 2</div>
+            <div class="team-role">Backend Engineer</div>
+            <p class="team-desc">Builds the core scanning pipeline, sandbox execution environment, and API infrastructure.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="team-card">
+            <div class="team-avatar dc-av-3">B</div>
+            <div class="team-name">Team Member 3</div>
+            <div class="team-role">Static Analysis Engineer</div>
+            <p class="team-desc">Develops AST taint flow detection, obfuscation patterns, and MITRE ATT&amp;CK mappings.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="team-card">
+            <div class="team-avatar dc-av-4">C</div>
+            <div class="team-name">Team Member 4</div>
+            <div class="team-role">Threat Intelligence</div>
+            <p class="team-desc">Curates IoC datasets, CVE enrichment pipelines, and compliance control mappings.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#view-overview -->

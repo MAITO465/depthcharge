@@ -1,0 +1,172 @@
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW: SCANNER
+════════════════════════════════════════════════════════════ -->
+<div id="view-scanner" class="view">
+
+  <div class="dc-page-header" style="background:var(--surface);border-bottom:1px solid var(--border);">
+    <div class="container-xl">
+      <div class="view-header" style="padding:24px 0 20px;">
+        <div>
+          <h1 class="view-title"><i class="bi bi-crosshair2 me-2" style="color:var(--blue);"></i>Package Scanner</h1>
+          <p class="view-sub">Reputation · Static Analysis · Dynamic Sandbox — multi-layer threat assessment</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-xl">
+    <div class="scanner-layout">
+
+      <!-- ── Left: Scan form + History ── -->
+      <div class="scanner-left">
+
+        <!-- Scan card -->
+        <div class="card scan-card mb-4">
+          <div class="scan-tabs">
+            <button class="scan-tab active" data-scan-tab="single">
+              <i class="fa-solid fa-crosshairs"></i> Single Package
+            </button>
+            <button class="scan-tab" data-scan-tab="bulk">
+              <i class="fa-solid fa-layer-group"></i> Bulk / requirements.txt
+            </button>
+          </div>
+
+          <!-- Single scan -->
+          <div class="scan-tab-panel active" id="panel-single">
+            <form id="scan-form">
+              <div class="field-group">
+                <label>Package Name</label>
+                <input type="text" id="package-input" placeholder="e.g. requests, lodash" autocomplete="off" required>
+              </div>
+              <div class="field-row">
+                <div class="field-group">
+                  <label>Registry</label>
+                  <select id="ecosystem-select">
+                    <option value="pypi">PyPI (Python)</option>
+                    <option value="npm">NPM (Node)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="module-row">
+                <span class="module-label">Modules</span>
+                <label class="toggle-chip">
+                  <input type="checkbox" id="toggle-rep" checked>
+                  <span>Reputation</span>
+                </label>
+                <label class="toggle-chip">
+                  <input type="checkbox" id="toggle-static" checked>
+                  <span>Static</span>
+                </label>
+                <label class="toggle-chip">
+                  <input type="checkbox" id="toggle-dynamic" checked>
+                  <span>Sandbox</span>
+                </label>
+              </div>
+              <button type="submit" class="btn-primary btn-full" id="scan-btn">
+                <i class="fa-solid fa-play"></i>
+                <span id="scan-btn-text">Execute Scan</span>
+                <i class="fa-solid fa-circle-notch fa-spin btn-spinner" id="scan-spinner" style="display:none;"></i>
+              </button>
+            </form>
+          </div>
+
+          <!-- Bulk scan -->
+          <div class="scan-tab-panel" id="panel-bulk">
+            <div class="field-group">
+              <label>Paste requirements.txt content</label>
+              <textarea id="bulk-input" rows="8" placeholder="requests>=2.28.0&#10;flask>=2.3.0&#10;numpy&#10;..."></textarea>
+            </div>
+            <div class="field-group">
+              <label>Registry</label>
+              <select id="bulk-ecosystem">
+                <option value="pypi">PyPI (Python)</option>
+                <option value="npm">NPM (Node)</option>
+              </select>
+            </div>
+            <button class="btn-primary btn-full" id="bulk-scan-btn">
+              <i class="fa-solid fa-layer-group"></i> Scan All Packages
+            </button>
+            <div id="bulk-result" style="display:none;" class="bulk-result mt-3"></div>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="card history-card">
+          <div class="history-head">
+            <span class="card-title"><i class="fa-solid fa-clock-rotate-left me-2" style="color:var(--blue);"></i>History</span>
+            <button class="btn-icon ms-auto" id="refresh-btn" title="Refresh">
+              <i class="fa-solid fa-rotate"></i>
+            </button>
+          </div>
+          <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="history-search" placeholder="Filter packages..." autocomplete="off">
+          </div>
+          <div class="history-list" id="history-items">
+            <div class="empty-msg small">
+              <i class="fa-solid fa-inbox"></i><p>No scans yet</p>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /.scanner-left -->
+
+      <!-- ── Right: Progress + Report ── -->
+      <div class="scanner-right">
+
+        <!-- Live progress panel -->
+        <div id="progress-panel" class="card progress-panel mb-4" style="display:none;">
+          <div class="progress-header">
+            <i class="fa-solid fa-radar fa-spin" id="progress-spinner"
+               style="color:var(--blue);"></i>
+            <span id="progress-pkg-label">Analyzing…</span>
+          </div>
+          <div class="phase-list" id="phase-list">
+            <div class="phase-step" data-phase="reputation">
+              <div class="phase-icon pending"><i class="fa-solid fa-circle"></i></div>
+              <div class="phase-info">
+                <span class="phase-name">Reputation Check</span>
+                <span class="phase-msg">Waiting…</span>
+              </div>
+            </div>
+            <div class="phase-step" data-phase="static">
+              <div class="phase-icon pending"><i class="fa-solid fa-circle"></i></div>
+              <div class="phase-info">
+                <span class="phase-name">Static Analysis</span>
+                <span class="phase-msg">Waiting…</span>
+              </div>
+            </div>
+            <div class="phase-step" data-phase="dynamic">
+              <div class="phase-icon pending"><i class="fa-solid fa-circle"></i></div>
+              <div class="phase-info">
+                <span class="phase-name">Dynamic Sandbox</span>
+                <span class="phase-msg">Waiting…</span>
+              </div>
+            </div>
+            <div class="phase-step" data-phase="scoring">
+              <div class="phase-icon pending"><i class="fa-solid fa-circle"></i></div>
+              <div class="phase-info">
+                <span class="phase-name">Risk Scoring</span>
+                <span class="phase-msg">Waiting…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detail / report card -->
+        <div id="detail-card" class="card report-card empty-state-card">
+          <div class="empty-state">
+            <div class="empty-icon-ring">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h3>Ready for Inspection</h3>
+            <p>Select a package from history or run a new scan to view the full threat analysis report.</p>
+          </div>
+        </div>
+
+      </div><!-- /.scanner-right -->
+
+    </div>
+  </div>
+
+</div><!-- /#view-scanner -->

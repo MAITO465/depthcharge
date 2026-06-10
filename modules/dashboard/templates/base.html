@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Depthcharge — Supply Chain Threat Analyzer{% endblock %}</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Font Awesome (used by JS-generated HTML for finding cards, phase steps, etc.) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Bootstrap 5 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <!-- Depthcharge design system -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/depthcharge.css') }}">
+
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TOP NAVIGATION
+════════════════════════════════════════════════════════════ -->
+<header class="dc-navbar">
+
+  <a class="dc-navbar-brand" href="#" onclick="navigate('overview'); return false;">
+    <div class="dc-brand-icon">
+      <i class="bi bi-shield-shaded"></i>
+    </div>
+    <div>
+      <div class="dc-brand-name">Depthcharge</div>
+      <div class="dc-brand-sub">Supply Chain Security</div>
+    </div>
+  </a>
+
+  <div class="dc-nav-links">
+    <a class="nav-item active" data-view="overview" href="#" onclick="navigate('overview'); return false;">
+      <i class="bi bi-grid-1x2-fill"></i>
+      <span class="nav-label">Overview</span>
+    </a>
+    <a class="nav-item" data-view="scanner" href="#" onclick="navigate('scanner'); return false;">
+      <i class="bi bi-crosshair2"></i>
+      <span class="nav-label">Scanner</span>
+      <span class="nav-badge" id="nav-scanning-badge"></span>
+    </a>
+    <a class="nav-item" data-view="findings" href="#" onclick="navigate('findings'); return false;">
+      <i class="bi bi-bug-fill"></i>
+      <span class="nav-label">Findings</span>
+      <span class="nav-badge" id="nav-findings-count"></span>
+    </a>
+    <a class="nav-item" data-view="inventory" href="#" onclick="navigate('inventory'); return false;">
+      <i class="bi bi-boxes"></i>
+      <span class="nav-label">Inventory</span>
+    </a>
+  </div>
+
+  <div class="dc-nav-right">
+    <div class="docker-status">
+      <span class="docker-dot offline" id="docker-dot"></span>
+      <span id="docker-label">Docker Offline</span>
+    </div>
+    <button class="btn-primary" onclick="navigate('scanner')">
+      <i class="bi bi-plus-lg"></i>
+      New Scan
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN CONTENT
+════════════════════════════════════════════════════════════ -->
+<main class="dc-main">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW: INVENTORY
+════════════════════════════════════════════════════════════ -->
+<div id="view-inventory" class="view">
+
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);">
+    <div class="container-xl" style="padding-top:28px;padding-bottom:24px;">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+          <h1 class="view-title"><i class="bi bi-boxes me-2" style="color:var(--blue);"></i>Package Inventory</h1>
+          <p class="view-sub">Enterprise asset-management view — all scanned packages with risk scores and scan history</p>
+        </div>
+        <button class="btn-icon-lg" id="inventory-refresh-btn" title="Refresh">
+          <i class="fa-solid fa-rotate me-1"></i> Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-xl py-4">
+    <div class="card">
+      <div id="inventory-table-wrap">
+        <div class="empty-msg">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          <p>Loading inventory...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#view-inventory -->

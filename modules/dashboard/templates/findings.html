@@ -1,0 +1,81 @@
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW: FINDINGS
+════════════════════════════════════════════════════════════ -->
+<div id="view-findings" class="view">
+
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);">
+    <div class="container-xl" style="padding-top:28px;padding-bottom:20px;">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+        <div>
+          <h1 class="view-title"><i class="bi bi-bug-fill me-2" style="color:var(--blue);"></i>Findings Explorer</h1>
+          <p class="view-sub">Enterprise SOC-style investigation center — all static alerts across every scan</p>
+        </div>
+        <button class="btn-icon-lg" id="findings-refresh-btn" title="Refresh">
+          <i class="fa-solid fa-rotate me-1"></i> Refresh
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="findings-filters">
+        <div class="filter-group">
+          <label>Severity</label>
+          <select id="filter-severity">
+            <option value="">All Severities</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Type</label>
+          <select id="filter-type">
+            <option value="">All Types</option>
+            <option value="taint_flow">Taint Flow</option>
+            <option value="obfuscation">Obfuscation</option>
+            <option value="chr_obfuscation">Chr Obfuscation</option>
+            <option value="ioc_match">IoC Match</option>
+            <option value="setup_hook_danger">Hook Danger</option>
+            <option value="sensitive_data">Sensitive Data</option>
+            <option value="dynamic_execution">Dynamic Exec</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>MITRE Technique</label>
+          <select id="filter-mitre">
+            <option value="">All Techniques</option>
+            <option value="T1195.001">T1195.001 — Supply Chain</option>
+            <option value="T1059">T1059 — Command Interpreter</option>
+            <option value="T1027">T1027 — Obfuscation</option>
+            <option value="T1552">T1552 — Credentials</option>
+            <option value="T1071">T1071 — C2 Protocol</option>
+          </select>
+        </div>
+        <div class="filter-group filter-search">
+          <label>Package</label>
+          <input type="text" id="filter-package" placeholder="Search package name...">
+        </div>
+        <button class="btn-secondary" id="findings-apply-btn">
+          <i class="fa-solid fa-filter"></i> Apply
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-xl py-4">
+
+    <div class="findings-summary" id="findings-summary" style="display:none;">
+      <span id="findings-count-badge" class="summary-badge">0 findings</span>
+      <div class="summary-chips" id="findings-sev-chips"></div>
+    </div>
+
+    <div class="card">
+      <div id="findings-table-wrap">
+        <div class="empty-msg">
+          <i class="fa-solid fa-bug"></i>
+          <p>Loading findings...</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /#view-findings -->

@@ -46,10 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const dot = $('docker-dot');
             const lbl = $('docker-label');
             if (d.docker_available) {
-                dot.className = 'status-dot online';
+                dot.className = 'docker-dot online';
                 lbl.textContent = 'Docker Sandbox Active';
             } else {
-                dot.className = 'status-dot offline';
+                dot.className = 'docker-dot offline';
                 lbl.textContent = 'Docker Offline';
             }
         } catch {}
@@ -99,13 +99,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     data: noData ? [1, 0, 0] : [high, medium, low],
                     backgroundColor: noData
-                        ? ['rgba(255,255,255,0.04)']
-                        : ['rgba(248,113,113,0.8)', 'rgba(251,191,36,0.8)', 'rgba(52,211,153,0.8)'],
-                    borderColor:     noData
-                        ? ['rgba(255,255,255,0.08)']
-                        : ['rgba(248,113,113,0.3)', 'rgba(251,191,36,0.3)', 'rgba(52,211,153,0.3)'],
+                        ? ['rgba(0,200,255,0.06)']
+                        : ['#ff2d6b', '#ff8c00', '#00ff88'],
+                    borderColor: noData
+                        ? ['rgba(0,200,255,0.12)']
+                        : ['rgba(255,45,107,0.6)', 'rgba(255,140,0,0.6)', 'rgba(0,255,136,0.6)'],
                     borderWidth: 1,
-                    hoverOffset: 4
+                    hoverOffset: 6
                 }]
             },
             options: {
@@ -130,30 +130,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     label: 'Risk Score',
                     data: scores,
-                    borderColor: 'rgba(99,102,241,0.8)',
-                    backgroundColor: 'rgba(99,102,241,0.08)',
+                    borderColor: '#00c8ff',
+                    backgroundColor: 'rgba(0,200,255,0.05)',
                     fill: true,
                     tension: 0.4,
-                    pointRadius: 3,
+                    pointRadius: 4,
                     pointBackgroundColor: scores.map(s =>
-                        s >= 70 ? '#f87171' : s >= 15 ? '#fbbf24' : '#34d399'),
-                    pointBorderWidth: 0
+                        s >= 70 ? '#ff2d6b' : s >= 15 ? '#ff8c00' : '#00ff88'),
+                    pointBorderColor: 'rgba(0,200,255,0.3)',
+                    pointBorderWidth: 1
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.03)' },
-                         ticks: { color: '#64748b', font: { size: 10 } } },
-                    x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 45 } }
+                    y: {
+                        min: 0, max: 100,
+                        grid: { color: 'rgba(0,200,255,0.05)' },
+                        ticks: { color: '#5a7a9a', font: { size: 10 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#5a7a9a', font: { size: 10 }, maxRotation: 45 }
+                    }
                 },
                 plugins: { legend: { display: false }, tooltip: {
-                    backgroundColor: '#0c0e18',
-                    borderColor: 'rgba(99,102,241,0.3)',
+                    backgroundColor: 'rgba(3,7,17,0.95)',
+                    borderColor: 'rgba(0,200,255,0.3)',
                     borderWidth: 1,
-                    titleColor: '#e2e8f0',
-                    bodyColor: '#94a3b8'
+                    titleColor: '#00c8ff',
+                    bodyColor: '#5a7a9a',
+                    padding: 10
                 }}
             }
         });
@@ -243,9 +251,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $$('.scan-tab').forEach(btn => {
         btn.addEventListener('click', () => {
             $$('.scan-tab').forEach(b => b.classList.remove('active'));
-            $$('.scan-tab-panel').forEach(p => p.classList.remove('active'));
+            $$('.scan-tab-panel').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
             btn.classList.add('active');
-            $('panel-' + btn.dataset.scanTab).classList.add('active');
+            const panel = $('panel-' + btn.dataset.scanTab);
+            if (panel) { panel.classList.add('active'); panel.style.display = 'block'; }
         });
     });
 
@@ -435,9 +444,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Maintainer change warning
         if (rep.maintainer_changed) {
             const warn = document.createElement('div');
-            warn.style.cssText = `margin-bottom:1rem;padding:0.65rem 1rem;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;font-size:0.8rem;color:var(--yellow);display:flex;gap:0.5rem;align-items:center;`;
+            warn.style.cssText = `margin-bottom:1rem;padding:0.65rem 1rem;background:var(--yellow-dim);border:1px solid rgba(202,138,4,0.2);border-radius:8px;font-size:0.8rem;color:var(--yellow);display:flex;gap:0.5rem;align-items:center;`;
             warn.innerHTML = `<i class="fa-solid fa-user-gear"></i> <strong>Maintainer change detected</strong> — previous: ${escHtml(rep.previous_maintainer_email || 'unknown')}`;
-            $('meta-grid')?.insertAdjacentElement('afterend', warn);
+            const metaGrid = document.querySelector('#detail-card .meta-grid') || document.getElementById('meta-grid');
+            if (metaGrid) metaGrid.insertAdjacentElement('afterend', warn);
         }
 
         /* ── Reasons ── */
@@ -736,9 +746,10 @@ document.addEventListener('DOMContentLoaded', () => {
         $$('.rtab').forEach(btn => {
             btn.addEventListener('click', () => {
                 $$('.rtab').forEach(b => b.classList.remove('active'));
-                $$('.rtab-panel').forEach(p => p.classList.remove('active'));
+                $$('.rtab-panel').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
                 btn.classList.add('active');
-                $('rpanel-' + btn.dataset.rtab).classList.add('active');
+                const panel = $('rpanel-' + btn.dataset.rtab);
+                if (panel) { panel.classList.add('active'); panel.style.display = 'block'; }
             });
         });
     }
@@ -1065,10 +1076,238 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ════════════════════════════════════════════════════════════
+       SUPPLY CHAIN NETWORK TOPOLOGY VISUALIZATION
+    ════════════════════════════════════════════════════════════ */
+    function initVisualization() {
+        const canvas = $('viz-canvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const wrap = canvas.parentElement;
+
+        function resize() {
+            canvas.width  = wrap.clientWidth  || 620;
+            canvas.height = wrap.clientHeight || 520;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // ── Strict monochromatic palette ─────────────────────────
+        const C = {
+            blue:      '#00c8ff',
+            blueMid:   'rgba(0,200,255,0.55)',
+            blueDim:   'rgba(0,200,255,0.20)',
+            edge:      'rgba(0,200,255,0.14)',
+            nodeBg:    'rgba(4,10,24,0.97)',
+            textBright:'rgba(196,218,242,0.88)',
+            textDim:   'rgba(86,116,150,0.60)',
+            grid:      'rgba(0,200,255,0.022)',
+        };
+
+        // ── Pipeline node definitions (fractional positions) ─────
+        const NODES = [
+            // Registry sources — left column
+            { id:'pypi',    label:'PyPI',    sub:'registry', xf:0.09, yf:0.30, r:21, tier:'src'  },
+            { id:'npm',     label:'npm',     sub:'registry', xf:0.09, yf:0.50, r:21, tier:'src'  },
+            { id:'github',  label:'git',     sub:'source',   xf:0.09, yf:0.70, r:21, tier:'src'  },
+            // Ingest hub
+            { id:'ingest',  label:'INGEST',  sub:'fetch',    xf:0.29, yf:0.50, r:25, tier:'hub'  },
+            // Analysis layer
+            { id:'static',  label:'STATIC',  sub:'ast·yara', xf:0.52, yf:0.23, r:24, tier:'proc' },
+            { id:'sandbox', label:'SANDBOX', sub:'dynamic',  xf:0.52, yf:0.41, r:24, tier:'proc' },
+            { id:'repute',  label:'REPUTE',  sub:'trust',    xf:0.52, yf:0.59, r:24, tier:'proc' },
+            { id:'cve',     label:'CVE',     sub:'intel',    xf:0.52, yf:0.77, r:24, tier:'proc' },
+            // Risk engine
+            { id:'engine',  label:'RISK',    sub:'engine',   xf:0.74, yf:0.50, r:27, tier:'hub'  },
+            // Final verdict
+            { id:'verdict', label:'VERDICT', sub:null,       xf:0.93, yf:0.50, r:34, tier:'out'  },
+        ];
+
+        const EDGES = [
+            { from:'pypi',    to:'ingest'  },
+            { from:'npm',     to:'ingest'  },
+            { from:'github',  to:'ingest'  },
+            { from:'ingest',  to:'static'  },
+            { from:'ingest',  to:'sandbox' },
+            { from:'ingest',  to:'repute'  },
+            { from:'ingest',  to:'cve'     },
+            { from:'static',  to:'engine'  },
+            { from:'sandbox', to:'engine'  },
+            { from:'repute',  to:'engine'  },
+            { from:'cve',     to:'engine'  },
+            { from:'engine',  to:'verdict' },
+        ];
+
+        // ── Flowing particles ────────────────────────────────────
+        const particles = [];
+        for (let i = 0; i < 24; i++) {
+            particles.push({
+                edge:  EDGES[i % EDGES.length],
+                t:     Math.random(),
+                speed: 0.003 + Math.random() * 0.005,
+                size:  1.4 + Math.random() * 1.6,
+                alpha: 0.45 + Math.random() * 0.55,
+            });
+        }
+
+        // Cubic bezier interpolation
+        function bz(p0, p1, p2, p3, t) {
+            const u = 1 - t;
+            return u*u*u*p0 + 3*u*u*t*p1 + 3*u*t*t*p2 + t*t*t*p3;
+        }
+
+        function buildNodeMap(W, H) {
+            const m = {};
+            NODES.forEach(n => { m[n.id] = { ...n, x: n.xf * W, y: n.yf * H }; });
+            return m;
+        }
+
+        let frame = 0;
+
+        function draw() {
+            const W = canvas.width;
+            const H = canvas.height;
+            const nm = buildNodeMap(W, H);
+
+            ctx.clearRect(0, 0, W, H);
+
+            // ── Background grid ───────────────────────────────────
+            ctx.save();
+            ctx.strokeStyle = C.grid;
+            ctx.lineWidth = 0.5;
+            const gs = Math.max(W, H) / 14;
+            for (let x = 0; x < W; x += gs) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+            }
+            for (let y = 0; y < H; y += gs) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+            }
+            ctx.restore();
+
+            // ── Edges (bezier, animated dash) ─────────────────────
+            EDGES.forEach(e => {
+                const a = nm[e.from], b = nm[e.to];
+                if (!a || !b) return;
+                const cpx = a.x + (b.x - a.x) * 0.5;
+
+                ctx.save();
+                ctx.strokeStyle = C.edge;
+                ctx.lineWidth   = 1;
+                ctx.setLineDash([3, 7]);
+                ctx.lineDashOffset = -(frame * 0.20);
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.bezierCurveTo(cpx, a.y, cpx, b.y, b.x, b.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            });
+
+            // ── Particles ─────────────────────────────────────────
+            particles.forEach(p => {
+                const a = nm[p.edge.from], b = nm[p.edge.to];
+                if (!a || !b) return;
+                const cpx = a.x + (b.x - a.x) * 0.5;
+                const px = bz(a.x, cpx, cpx, b.x, p.t);
+                const py = bz(a.y, a.y,  b.y,  b.y, p.t);
+                const fade = Math.sin(p.t * Math.PI);
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha * fade;
+                ctx.shadowColor = C.blue;
+                ctx.shadowBlur  = 7;
+                ctx.fillStyle   = C.blue;
+                ctx.beginPath();
+                ctx.arc(px, py, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                p.t += p.speed;
+                if (p.t >= 1) {
+                    p.edge  = EDGES[Math.floor(Math.random() * EDGES.length)];
+                    p.t     = 0;
+                    p.speed = 0.003 + Math.random() * 0.005;
+                    p.alpha = 0.45 + Math.random() * 0.55;
+                }
+            });
+
+            // ── Nodes ─────────────────────────────────────────────
+            NODES.forEach(nd => {
+                const n  = nm[nd.id];
+                const isOut  = n.tier === 'out';
+                const isHub  = n.tier === 'hub';
+                const isSrc  = n.tier === 'src';
+
+                // Outer pulsing ring (verdict only)
+                if (isOut) {
+                    const pr = n.r + 9 + 3 * Math.sin(frame * 0.05);
+                    const pa = 0.16 + 0.09 * Math.sin(frame * 0.05);
+                    ctx.save();
+                    ctx.strokeStyle = `rgba(0,200,255,${pa})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(n.x, n.y, pr, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Node fill + border
+                ctx.save();
+                ctx.shadowColor = C.blue;
+                ctx.shadowBlur  = isOut ? 22 : (isHub ? 9 : 0);
+
+                if (isOut) {
+                    const g = ctx.createRadialGradient(n.x, n.y - n.r*0.25, 2, n.x, n.y, n.r);
+                    g.addColorStop(0, 'rgba(0,150,220,0.22)');
+                    g.addColorStop(1, 'rgba(0,35,100,0.12)');
+                    ctx.fillStyle   = g;
+                    ctx.strokeStyle = 'rgba(0,200,255,0.65)';
+                    ctx.lineWidth   = 1.5;
+                } else {
+                    ctx.fillStyle   = C.nodeBg;
+                    ctx.strokeStyle = isHub ? 'rgba(0,200,255,0.46)' : (isSrc ? 'rgba(0,200,255,0.28)' : 'rgba(0,200,255,0.22)');
+                    ctx.lineWidth   = 1;
+                }
+
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+
+                // Labels
+                ctx.save();
+                ctx.textAlign = 'center';
+
+                ctx.fillStyle    = isOut ? C.blue : (isHub ? 'rgba(200,220,242,0.90)' : 'rgba(175,205,238,0.72)');
+                ctx.font         = `600 ${isOut ? 8.5 : 8}px "JetBrains Mono", monospace`;
+                ctx.textBaseline = n.sub ? 'bottom' : 'middle';
+                if (isOut) { ctx.shadowColor = C.blue; ctx.shadowBlur = 9; }
+                ctx.fillText(n.label, n.x, n.sub ? n.y + 1 : n.y);
+
+                if (n.sub) {
+                    ctx.font         = `400 6.5px "JetBrains Mono", monospace`;
+                    ctx.fillStyle    = C.textDim;
+                    ctx.textBaseline = 'top';
+                    ctx.shadowBlur   = 0;
+                    ctx.fillText(n.sub, n.x, n.y + 2);
+                }
+                ctx.restore();
+            });
+
+            frame++;
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    }
+
+    /* ════════════════════════════════════════════════════════════
        INIT
     ════════════════════════════════════════════════════════════ */
     checkStatus();
     loadOverview();
     loadHistory();
     updateFindingsNavCount();
+    initVisualization();
 });
