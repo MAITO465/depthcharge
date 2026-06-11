@@ -116,7 +116,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt --quiet
+          pip install requests docker rich flask flask-sqlalchemy packaging reportlab --quiet
 
       - name: Run Depthcharge on requirements.txt
         id: scan
