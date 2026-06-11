@@ -121,17 +121,14 @@ jobs:
       - name: Run Depthcharge on requirements.txt
         id: scan
         run: |
-          # Scan requirements.txt if it exists, otherwise scan a default set
           if [ -f requirements.txt ]; then
-            python depthcharge.py \
+            python depthcharge.py scan \
               --lockfile requirements.txt \
-              --format markdown \
-              --output depthcharge-report.md || true
+              --skip-dynamic \
+              --markdown depthcharge-report.md || true
           else
             echo "No requirements.txt found — skipping package scan." > depthcharge-report.md
           fi
-
-          # Capture exit code to determine if high-risk packages were found
           echo "report_exists=true" >> $GITHUB_OUTPUT
 
       - name: Post PR comment with Depthcharge report
