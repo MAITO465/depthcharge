@@ -16,10 +16,15 @@ jobs:
   semgrep:
     name: "Semgrep — Static Analysis"
     runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Semgrep
+        run: pip install semgrep
 
       - name: Run Semgrep (custom supply-chain rules + security-audit ruleset)
         run: |
