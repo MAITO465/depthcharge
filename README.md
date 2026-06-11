@@ -195,3 +195,4 @@ Depthcharge is designed to be highly modular. Potential future enhancements incl
 2. **AI-Powered Code Analysis:** Integrating an LLM agent into the Static Engine to semantically analyze obfuscated JavaScript/Python payloads and explain the exact intent of the malicious code in the dashboard.
 3. **RubyGems & Crates.io Support:** Expanding the ecosystem registries beyond PyPI and NPM to support Ruby and Rust dependency analysis.
 4. **Automated Remediation:** Providing automatic pull requests to downgrade or swap out malicious packages in a developer's repository based on CI/CD scan results.
+# test
