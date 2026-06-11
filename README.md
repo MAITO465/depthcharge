@@ -22,31 +22,13 @@
 
 ## 🎬 Demo
 
-<!--
-  HOW TO ADD THE DEMO VIDEO (no YouTube needed):
-  1. Open this README on github.com and click the pencil (Edit) icon.
-  2. Drag & drop your demo.mp4 into the editor. GitHub uploads it and inserts
-     a line like:  https://github.com/user-attachments/assets/xxxxxxxx
-  3. That line renders as an inline video player. Paste it just below this comment,
-     then delete the placeholder line.
-  If GitHub says the file is too large, compress it first (see ffmpeg tip in the PR/issue)
-  or host it as an "Unlisted" YouTube video and link it here instead.
--->
 
-<!-- ▶️ Replace this line with the github.com/user-attachments/assets/... URL after drag-and-drop -->
-_Demo video coming soon — drag your `demo.mp4` into this README on GitHub to embed it._
 
-> 🌐 **Landing page:** [depthcharge.vercel.app](https://depthcharge.vercel.app) <!-- TODO: update once deployed -->
->
-> The landing page plays the demo from a self-hosted `demo.mp4` placed next to `index.html`.
 
-<!-- Optional: add screenshots to docs/screenshots/ and uncomment below
-<div align="center">
-  <img src="docs/screenshots/dashboard-overview.png" alt="DepthCharge dashboard overview" width="80%">
-</div>
--->
 
----
+
+> 🌐 **Landing page:** [depthcharge.vercel.app](https://depthcharge.vercel.app) 
+
 
 ## 📖 Overview
 
