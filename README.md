@@ -280,12 +280,12 @@ Built by a four-member team in the **Génie Cyber-Défense & Systèmes de Télé
     </td>
     <td align="center" width="25%">
       <!-- TODO: replace GITHUB_YOUSSRA with Youssra's GitHub handle -->
-      <a href="https://github.com/GITHUB_YOUSSRA"><img src="https://github.com/GITHUB_YOUSSRA.png" width="90" style="border-radius:50%" alt="Youssra Zarri"/><br/><sub><b>Youssra Zarri</b></sub></a><br/>
+      <a href="https://github.com/GITHUB_YOUSSRA"><img src="https://github.com/rainisveryswag.png" width="90" style="border-radius:50%" alt="Youssra Zarri"/><br/><sub><b>Youssra Zarri</b></sub></a><br/>
       <sub>Static Analysis (AST / YARA)</sub>
     </td>
     <td align="center" width="25%">
       <!-- TODO: replace GITHUB_WIAM with Wiam's GitHub handle -->
-      <a href="https://github.com/GITHUB_WIAM"><img src="https://github.com/GITHUB_WIAM.png" width="90" style="border-radius:50%" alt="Wiam Baba"/><br/><sub><b>Wiam Baba</b></sub></a><br/>
+      <a href="https://github.com/wiiam8"><img src="https://github.com/wiiam8.png" width="90" style="border-radius:50%" alt="Wiam Baba"/><br/><sub><b>Wiam Baba</b></sub></a><br/>
       <sub>Reputation & Intelligence</sub>
     </td>
   </tr>
