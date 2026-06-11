@@ -27,7 +27,7 @@
 
 
 
-> 🌐 **Landing page:** [depthcharge.vercel.app](https://depthcharge.vercel.app) 
+> 🌐 **Landing page:** ([https://depthcharge.vercel.app](https://depth-search-landing.vercel.app)) 
 
 
 ## 📖 Overview
