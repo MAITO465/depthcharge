@@ -1,0 +1,2 @@
+exclude_paths:
+  - demo/vulnerable_app/app.py
