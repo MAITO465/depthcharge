@@ -16,18 +16,26 @@ jobs:
   semgrep:
     name: "Semgrep — Static Analysis"
     runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
       - name: Run Semgrep (custom supply-chain rules + security-audit ruleset)
         run: |
-          semgrep ci \
+          semgrep scan \
             --config .semgrep/supply-chain.yml \
             --config "p/python" \
             --config "p/security-audit" \
-            --json --output semgrep-report.json || true
+            --json --output semgrep-report.json \
+            --error \
+            --no-git-ignore \
+            . || (echo "Semgrep found security issues — failing build" && exit 1)
 
       - name: Upload Semgrep report
         uses: actions/upload-artifact@v4
