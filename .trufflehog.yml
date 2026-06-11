@@ -1,2 +1,3 @@
 exclude_paths:
   - demo/vulnerable_app/app.py
+  - malicious_test.py
