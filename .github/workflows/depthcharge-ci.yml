@@ -86,7 +86,7 @@ jobs:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --debug --only-verified
+          extra_args: --debug
 
   # ── GitLeaks secrets scan (Wiam) ───────────────────────────────────────────
   gitleaks:
@@ -116,7 +116,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests docker rich flask flask-sqlalchemy packaging reportlab --quiet
+          pip install requests docker rich flask flask-sqlalchemy packaging reportlab python-Levenshtein yara-python --quiet
 
       - name: Run Depthcharge on requirements.txt
         id: scan
