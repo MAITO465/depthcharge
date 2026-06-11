@@ -1,0 +1,20 @@
+# ZAP rule configuration for Depthcharge demo app
+# Format: rule_id	ACTION	PARAMETER
+# Actions: IGNORE, WARN, FAIL
+# See: https://www.zaproxy.org/docs/docker/baseline-scan/
+
+# Treat these as warnings (not failures) for demo purposes
+10010	WARN	(Cookie No HttpOnly Flag)
+10015	WARN	(Incomplete or No Cache-control and Pragma HTTP Header Set)
+10020	WARN	(X-Frame-Options Header Not Set)
+10021	WARN	(X-Content-Type-Options Header Missing)
+10023	WARN	(Information Disclosure - Debug Error Messages)
+10027	WARN	(Information Disclosure - Suspicious Comments)
+
+# Fail on critical issues — these should always block
+40012	FAIL	(Cross Site Scripting (Reflected))
+40014	FAIL	(Cross Site Scripting (Persistent))
+40018	FAIL	(SQL Injection)
+40019	FAIL	(SQL Injection - MySQL)
+90020	FAIL	(Remote OS Command Injection)
+90022	FAIL	(Application Error Disclosure)

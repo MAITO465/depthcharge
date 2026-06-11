@@ -1,0 +1,186 @@
+rules:
+
+  # ── Eval / Exec of encoded payloads ────────────────────────────────────────
+  - id: eval-of-base64-decoded-data
+    patterns:
+      - pattern: eval(base64.b64decode(...))
+      - pattern: exec(base64.b64decode(...))
+      - pattern: eval(__import__('base64').b64decode(...))
+      - pattern: exec(__import__('base64').b64decode(...))
+    message: >
+      eval/exec of base64-decoded data detected.
+      Classic malware pattern used to hide payloads inside packages.
+      MITRE T1027 - Obfuscated Files or Information.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: CWE-94
+      mitre: T1027
+      category: supply-chain
+      confidence: HIGH
+
+  - id: eval-of-zlib-decoded-data
+    patterns:
+      - pattern: eval(zlib.decompress(...))
+      - pattern: exec(zlib.decompress(...))
+    message: >
+      eval/exec of zlib-decompressed data detected.
+      Malware often double-encodes payloads (base64 + zlib) to evade detection.
+      MITRE T1027 - Obfuscated Files or Information.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      mitre: T1027
+      category: supply-chain
+      confidence: HIGH
+
+  # ── subprocess / os.system in install hooks ─────────────────────────────────
+  - id: subprocess-in-setup-hook
+    patterns:
+      - pattern: subprocess.$FUNC(...)
+    paths:
+      include:
+        - "**/setup.py"
+        - "**/setup.cfg"
+        - "**/__init__.py"
+    message: >
+      subprocess call detected in a package install hook (setup.py or __init__.py).
+      Legitimate packages rarely spawn processes during install.
+      MITRE T1195.001 - Compromise Software Dependencies.
+    languages: [python]
+    severity: WARNING
+    metadata:
+      mitre: T1195.001
+      category: supply-chain
+      confidence: MEDIUM
+
+  - id: subprocess-shell-true
+    patterns:
+      - pattern: subprocess.$FUNC(..., shell=True, ...)
+    message: >
+      subprocess call with shell=True detected.
+      This allows shell injection and is a common pattern in malicious packages.
+      MITRE T1059 - Command and Scripting Interpreter.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      mitre: T1059
+      category: supply-chain
+      confidence: HIGH
+
+  - id: os-system-in-setup-hook
+    patterns:
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+    paths:
+      include:
+        - "**/setup.py"
+        - "**/__init__.py"
+    message: >
+      os.system/popen call in a package install hook.
+      Attackers use this to execute shell commands silently during pip install.
+      MITRE T1195.001 - Compromise Software Dependencies.
+    languages: [python]
+    severity: WARNING
+    metadata:
+      mitre: T1195.001
+      category: supply-chain
+      confidence: MEDIUM
+
+  - id: pickle-loads-user-input
+    patterns:
+      - pattern: pickle.loads(...)
+    message: >
+      pickle.loads() detected. Deserializing untrusted data with pickle
+      allows arbitrary code execution. MITRE T1059 - Code Injection.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      mitre: T1059
+      cwe: CWE-502
+      category: supply-chain
+      confidence: HIGH
+
+  # ── Environment variable exfiltration ──────────────────────────────────────
+  - id: env-var-sent-to-network
+    pattern: |
+      $DATA = os.environ.get(...)
+      ...
+      requests.$METHOD(..., $DATA, ...)
+    message: >
+      Environment variable value passed to an HTTP request.
+      Common pattern for stealing secrets, API keys, or tokens from the install
+      environment. MITRE T1552 - Unsecured Credentials.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      mitre: T1552
+      category: supply-chain
+      confidence: HIGH
+
+  # ── Dynamic attribute resolution (getattr obfuscation) ─────────────────────
+  - id: getattr-dynamic-execution
+    pattern: getattr(__builtins__, $NAME)(...)
+    message: >
+      Dynamic function resolution via getattr(__builtins__, ...) detected.
+      Used to call eval/exec/compile without the literal keyword to evade
+      simple pattern matching. MITRE T1027 - Obfuscated Files or Information.
+    languages: [python]
+    severity: WARNING
+    metadata:
+      mitre: T1027
+      category: supply-chain
+      confidence: MEDIUM
+
+  # ── chr() array obfuscation ─────────────────────────────────────────────────
+  - id: chr-array-string-construction
+    pattern: '''"".join([chr(...), ...])'''
+    message: >
+      String constructed from chr() array.
+      Malicious packages use this to hide function names, URLs, or commands
+      from static analysis tools. MITRE T1027 - Obfuscated Files or Information.
+    languages: [python]
+    severity: WARNING
+    metadata:
+      mitre: T1027
+      category: supply-chain
+      confidence: MEDIUM
+
+  # ── Network socket in install hook ──────────────────────────────────────────
+  - id: socket-in-setup-hook
+    patterns:
+      - pattern: socket.socket(...)
+      - pattern: socket.connect(...)
+    paths:
+      include:
+        - "**/setup.py"
+        - "**/__init__.py"
+    message: >
+      Raw socket operation detected in a package install hook.
+      Malware may open a reverse shell or exfiltrate data via raw socket
+      during installation. MITRE T1059 - Command and Scripting Interpreter.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      mitre: T1059
+      category: supply-chain
+      confidence: HIGH
+
+  # ── Hardcoded C2 / exfil URLs ──────────────────────────────────────────────
+  - id: hardcoded-exfil-endpoint
+    patterns:
+      - pattern: requests.$METHOD("https://webhook.site/...", ...)
+      - pattern: requests.$METHOD("https://pipedream.net/...", ...)
+      - pattern: requests.$METHOD("https://requestbin.net/...", ...)
+      - pattern: requests.$METHOD("https://ngrok.io/...", ...)
+    message: >
+      Hardcoded known exfiltration endpoint detected.
+      Sites like webhook.site and pipedream.net are commonly abused
+      in supply chain attacks to receive stolen data.
+      MITRE T1071 - Application Layer Protocol.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      mitre: T1071
+      category: supply-chain
+      confidence: HIGH

@@ -1,0 +1,166 @@
+# Depthcharge — Custom Falco Runtime Security Rules
+# Yasser Chettour — Dashboard & CI/CD
+#
+# These rules detect malicious behavior during package installation
+# and runtime execution inside the Depthcharge Docker sandbox.
+#
+# Deploy: falco -r /etc/falco/falco_rules.yaml -r depthcharge_rules.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Macros ──────────────────────────────────────────────────────────────────
+
+- macro: package_manager_proc
+  condition: proc.name in (pip, pip3, pip3.11, npm, yarn, poetry)
+
+- macro: python_proc
+  condition: proc.name in (python, python3, python3.11)
+
+- macro: node_proc
+  condition: proc.name in (node, nodejs)
+
+- macro: install_hook_proc
+  condition: >
+    (package_manager_proc or python_proc or node_proc) and
+    proc.cmdline contains "setup.py" or
+    proc.cmdline contains "install"
+
+- macro: trusted_write_dirs
+  condition: >
+    fd.name startswith /tmp/ or
+    fd.name startswith /home/ or
+    fd.name startswith /usr/lib/python or
+    fd.name startswith /usr/local/lib/ or
+    fd.name startswith /usr/local/bin/ or
+    fd.name startswith /opt/ or
+    fd.name startswith /root/.cache/
+
+# ── Rules ───────────────────────────────────────────────────────────────────
+
+- rule: Package Install Outbound Network Connection
+  desc: >
+    Detect outbound network connections made during package installation.
+    Legitimate packages should not initiate network calls during pip/npm install.
+    This is a primary indicator of data exfiltration or C2 beaconing.
+  condition: >
+    evt.type = connect and
+    evt.dir = < and
+    install_hook_proc and
+    fd.typechar = 4 and
+    not fd.sip in (127.0.0.1, ::1)
+  output: >
+    Outbound network connection during package install
+    (proc=%proc.name pid=%proc.pid cmdline=%proc.cmdline
+    destination=%fd.rip:%fd.rport container=%container.name)
+  priority: CRITICAL
+  tags: [supply_chain, network, T1071, depthcharge]
+
+- rule: Package Install DNS Lookup
+  desc: >
+    DNS resolution during package installation may indicate
+    the package is trying to reach a C2 server or exfiltration endpoint.
+  condition: >
+    evt.type = connect and
+    install_hook_proc and
+    fd.rport = 53
+  output: >
+    DNS query during package install
+    (proc=%proc.name cmdline=%proc.cmdline container=%container.name)
+  priority: WARNING
+  tags: [supply_chain, network, T1071, depthcharge]
+
+- rule: File Write Outside Expected Paths During Install
+  desc: >
+    Detect file writes to unexpected locations during package installation.
+    Malware may write backdoors to /etc, /root/.ssh, /usr/bin, or crontabs.
+  condition: >
+    open_write and
+    install_hook_proc and
+    not trusted_write_dirs and
+    not fd.name startswith /proc/ and
+    not fd.name startswith /sys/
+  output: >
+    Unexpected file write during package installation
+    (proc=%proc.name file=%fd.name cmdline=%proc.cmdline
+    container=%container.name user=%user.name)
+  priority: CRITICAL
+  tags: [supply_chain, file_write, T1195.001, depthcharge]
+
+- rule: SSH Key or Credential File Access
+  desc: >
+    Package installation code accessing SSH keys, .aws credentials,
+    or .env files is a strong indicator of credential theft.
+  condition: >
+    open_read and
+    install_hook_proc and
+    (fd.name contains "id_rsa" or
+     fd.name contains "id_ed25519" or
+     fd.name contains ".aws/credentials" or
+     fd.name contains ".env" or
+     fd.name contains ".bash_history" or
+     fd.name contains "authorized_keys")
+  output: >
+    Credential file access during package install
+    (proc=%proc.name file=%fd.name cmdline=%proc.cmdline
+    container=%container.name user=%user.name)
+  priority: CRITICAL
+  tags: [supply_chain, credential_theft, T1552, depthcharge]
+
+- rule: Child Process Spawned by Package Install
+  desc: >
+    A package spawning unexpected child processes during installation
+    is a strong signal of install-time code execution backdoors.
+  condition: >
+    spawned_process and
+    proc.pname in (python, python3, python3.11, node) and
+    proc.name in (bash, sh, dash, zsh, curl, wget, nc, ncat, netcat,
+                  chmod, chown, cron, crontab, at, systemctl)
+  output: >
+    Suspicious child process spawned during package operation
+    (parent=%proc.pname child=%proc.name cmdline=%proc.cmdline
+    container=%container.name user=%user.name)
+  priority: CRITICAL
+  tags: [supply_chain, process_spawn, T1059, depthcharge]
+
+- rule: Reverse Shell Attempt
+  desc: >
+    Detect classic reverse shell patterns: bash/sh redirected to a network socket.
+    This is the most severe supply chain attack behavior.
+  condition: >
+    spawned_process and
+    proc.name in (bash, sh, dash) and
+    proc.cmdline contains "/dev/tcp/" or
+    proc.cmdline contains "nc -e" or
+    proc.cmdline contains "ncat -e"
+  output: >
+    Reverse shell attempt detected
+    (proc=%proc.name cmdline=%proc.cmdline
+    container=%container.name user=%user.name pid=%proc.pid)
+  priority: CRITICAL
+  tags: [supply_chain, reverse_shell, T1059.004, depthcharge]
+
+- rule: Crontab Modification
+  desc: >
+    Package modifying crontab establishes persistence on the host system.
+  condition: >
+    (open_write and fd.name contains "cron") or
+    (spawned_process and proc.name = crontab)
+  output: >
+    Crontab modification detected — possible persistence mechanism
+    (proc=%proc.name cmdline=%proc.cmdline container=%container.name)
+  priority: ERROR
+  tags: [supply_chain, persistence, T1053, depthcharge]
+
+- rule: Package Reading /etc/passwd or /etc/shadow
+  desc: >
+    Reading system credential files during package operation is a
+    strong indicator of host reconnaissance or credential harvesting.
+  condition: >
+    open_read and
+    (python_proc or node_proc) and
+    (fd.name = /etc/passwd or fd.name = /etc/shadow or fd.name = /etc/hosts)
+  output: >
+    System file read during package execution
+    (proc=%proc.name file=%fd.name cmdline=%proc.cmdline
+    container=%container.name)
+  priority: ERROR
+  tags: [supply_chain, reconnaissance, T1082, depthcharge]

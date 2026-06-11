@@ -1,0 +1,97 @@
+name: OWASP ZAP DAST Baseline Scan
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"   # every Monday at 03:00 UTC
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+  pull_request:
+    paths:
+      - "demo/vulnerable_app/**"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  zap-baseline:
+    name: "ZAP Baseline — Vulnerable Demo App"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install demo app dependencies
+        run: pip install flask --quiet
+
+      - name: Start vulnerable demo app
+        run: |
+          python demo/vulnerable_app/app.py &
+          sleep 4
+          curl -sf http://127.0.0.1:5050/ || (echo "App failed to start" && exit 1)
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: "http://127.0.0.1:5050"
+          rules_file_name: ".zap/rules.tsv"
+          cmd_options: "-a"         # include ajax spider
+          fail_action: false        # report but don't fail the job
+          artifact_name: zap-report
+          allow_issue_writing: true
+
+      - name: Upload ZAP HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-html-report
+          path: report_html.html
+
+      - name: Upload ZAP JSON report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-json-report
+          path: report_json.json
+
+      - name: Post ZAP summary as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let summary = '_ZAP report not found._';
+            try {
+              const raw = JSON.parse(fs.readFileSync('report_json.json', 'utf8'));
+              const alerts = raw.site?.[0]?.alerts || [];
+              const high   = alerts.filter(a => a.riskcode === '3').length;
+              const medium = alerts.filter(a => a.riskcode === '2').length;
+              const low    = alerts.filter(a => a.riskcode === '1').length;
+              summary = [
+                '## 🕷️ OWASP ZAP DAST Scan Results',
+                '',
+                `| Severity | Count |`,
+                `|----------|-------|`,
+                `| 🔴 High   | ${high}   |`,
+                `| 🟠 Medium | ${medium} |`,
+                `| 🟡 Low    | ${low}    |`,
+                '',
+                '**Top Findings:**',
+                ...alerts.slice(0, 5).map(a =>
+                  `- **${a.alert}** (${['Info','Low','Medium','High'][a.riskcode] || a.riskcode}): ${a.desc?.slice(0,120)}...`
+                ),
+              ].join('\n');
+            } catch (e) {
+              summary = `ZAP scan completed — could not parse report: ${e.message}`;
+            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary,
+            });
